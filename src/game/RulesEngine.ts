@@ -4,29 +4,81 @@ import { GameState } from './ScoreSystem';
 export class RulesEngine {
   private static colorSequence: ('yellow' | 'green' | 'brown' | 'blue' | 'pink' | 'black')[] = 
     ['yellow', 'green', 'brown', 'blue', 'pink', 'black'];
+  
+  private static colorPointValues: { [key: string]: number } = {
+    yellow: 2,
+    green: 3,
+    brown: 4,
+    blue: 5,
+    pink: 6,
+    black: 7,
+  };
+
+  // Get foul points for a specific ball
+  private static getFoulPointsForBall(ballId: string): number {
+    if (ballId === 'cue') return 4;
+    
+    const colorPoints = this.colorPointValues[ballId];
+    return colorPoints || 4; // Default to 4 if ball not found
+  }
 
   // Check if a shot is valid according to snooker rules
   public static validateShot(
     state: GameState,
     pottedBalls: Ball[],
-    cueBallPocketed: boolean
-  ): { valid: boolean; reason?: string; foulPoints?: number } {
-    // Check for cue ball potted (always a foul)
+    cueBallPocketed: boolean,
+    firstBallHit?: Ball | null // The first ball the cue ball collided with
+    ): { valid: boolean; reason?: string; foulPoints?: number } {
+    // Determine if a foul occurred and calculate foul points
+    let foulPoints = 4; // Default foul points
+
+    // Check if cue ball was pocketed
     if (cueBallPocketed) {
-      return { valid: false, reason: 'Cue ball potted', foulPoints: 4 };
+      // If on a color, use the color's point value, otherwise 4
+      if (state.nextRequiredType !== 'red' && state.nextRequiredType !== 'any-color') {
+        foulPoints = this.getFoulPointsForBall(state.nextRequiredType);
+      } else {
+        foulPoints = 4;
+      }
+      return { valid: false, reason: 'Cue ball potted', foulPoints };
     }
 
-    // If no balls potted, it's a valid shot (as long as we hit the correct ball first)
-    // For simplicity, we assume hitting the correct ball first if it's not potted.
-    // In a real game, we'd need collision detection to know which ball was hit first.
-    if (pottedBalls.length === 0) return { valid: true };
+    // Check if no ball was hit (requires firstBallHit to be null or undefined)
+    if (firstBallHit === null) {
+      return { valid: false, reason: 'Failed to hit any ball', foulPoints: 4 };
+    }
+
+    // If no balls potted, check if correct ball was hit
+    if (pottedBalls.length === 0) {
+      // If a ball was hit but nothing potted, it's valid (as long as correct ball was hit)
+      if (firstBallHit) {
+        if (state.nextRequiredType === 'red') {
+          if (firstBallHit.type !== 'red') {
+            const ballPoints = this.getFoulPointsForBall(firstBallHit.id);
+            return { valid: false, reason: `Hit wrong ball (${firstBallHit.id})`, foulPoints: ballPoints };
+          }
+        } else if (state.nextRequiredType === 'any-color') {
+          if (firstBallHit.type !== 'color') {
+            return { valid: false, reason: 'Must hit a color', foulPoints: 4 };
+          }
+        } else {
+          if (firstBallHit.id !== state.nextRequiredType) {
+            const ballPoints = this.getFoulPointsForBall(firstBallHit.id);
+            return { valid: false, reason: `Must hit ${state.nextRequiredType}`, foulPoints: ballPoints };
+          }
+        }
+      }
+      return { valid: true };
+    }
 
     // Check potting sequence
     const firstPotted = pottedBalls[0];
     
     if (state.nextRequiredType === 'red') {
       if (firstPotted.type !== 'red') {
-        return { valid: false, reason: 'Must pot a red', foulPoints: 4 };
+        // Potted wrong color when trying for red
+        const ballPoints = this.getFoulPointsForBall(firstPotted.id);
+        return { valid: false, reason: 'Must pot a red', foulPoints: ballPoints };
       }
       // If multiple balls potted, they must all be reds
       if (pottedBalls.some(b => b.type !== 'red')) {
@@ -34,7 +86,7 @@ export class RulesEngine {
       }
     } else if (state.nextRequiredType === 'any-color') {
       if (firstPotted.type !== 'color') {
-        return { valid: false, reason: 'Must pot a color', foulPoints: 7 };
+        return { valid: false, reason: 'Must pot a color', foulPoints: 4 };
       }
       if (pottedBalls.length > 1) {
         return { valid: false, reason: 'Cannot pot multiple colors', foulPoints: 7 };
@@ -42,7 +94,8 @@ export class RulesEngine {
     } else {
       // Must pot the specific color in sequence
       if (firstPotted.id !== state.nextRequiredType) {
-        return { valid: false, reason: `Must pot ${state.nextRequiredType}`, foulPoints: 7 };
+        const ballPoints = this.getFoulPointsForBall(firstPotted.id);
+        return { valid: false, reason: `Must pot ${state.nextRequiredType}`, foulPoints: ballPoints };
       }
       if (pottedBalls.length > 1) {
         return { valid: false, reason: 'Cannot pot multiple balls', foulPoints: 7 };
@@ -78,9 +131,10 @@ export class RulesEngine {
   public static processShotResult(
     state: GameState,
     pottedBalls: Ball[],
-    cueBallPocketed: boolean
+    cueBallPocketed: boolean,
+    firstBallHit?: Ball | null
   ): GameState {
-    const validation = this.validateShot(state, pottedBalls, cueBallPocketed);
+    const validation = this.validateShot(state, pottedBalls, cueBallPocketed, firstBallHit);
     let newState = { ...state };
 
     if (!validation.valid) {

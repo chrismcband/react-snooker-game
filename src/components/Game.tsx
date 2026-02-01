@@ -47,6 +47,7 @@ export const Game: React.FC = () => {
   const pocketedBallsRef = useRef<BallType[]>([]);
   const cueBallPocketedRef = useRef<boolean>(false);
   const shotJustEndedRef = useRef<boolean>(false);
+  const firstBallHitRef = useRef<BallType | null>(null);
 
     const balls = gameState.balls;
     
@@ -166,6 +167,7 @@ export const Game: React.FC = () => {
 
     setIsShotInProgress(true);
     shotJustEndedRef.current = false;  // Reset for new shot
+    firstBallHitRef.current = null;  // Reset first ball hit tracker
     
     // Clear AI shot only after the physics simulation starts
     // This prevents the animation from being re-triggered
@@ -261,6 +263,7 @@ export const Game: React.FC = () => {
       }
 
       // Check ball-to-ball collisions
+      // Track the first ball the cue ball hits
       for (let i = 0; i < newBalls.length; i++) {
         for (let j = i + 1; j < newBalls.length; j++) {
           const ball1 = newBalls[i];
@@ -268,6 +271,15 @@ export const Game: React.FC = () => {
 
           if (!ball1.isPocketed && !ball2.isPocketed) {
             if (CollisionSystem.checkBallCollision(ball1, ball2)) {
+              // Track if cue ball hit something for the first time this shot
+              if (firstBallHitRef.current === null) {
+                if (ball1.id === 'cue' && ball2.id !== 'cue') {
+                  firstBallHitRef.current = ball2;
+                } else if (ball2.id === 'cue' && ball1.id !== 'cue') {
+                  firstBallHitRef.current = ball1;
+                }
+              }
+              
               CollisionSystem.resolveBallCollision(ball1, ball2);
             }
           }
@@ -368,16 +380,16 @@ export const Game: React.FC = () => {
        
        let newState = gameState;
        
-       // Call RulesEngine.processShotResult with the correct balls
-       if (ballsPottedThisShotRef.current > 0 || cueBallPocketedRef.current) {
-         // Balls were potted - pass them to RulesEngine
-         console.log('Calling RulesEngine.processShotResult with potted balls');
-         newState = RulesEngine.processShotResult(newState, pocketedBallsRef.current, cueBallPocketedRef.current);
-       } else {
-         // No balls potted - pass empty array
-         console.log('Calling RulesEngine.processShotResult for no-balls-potted case');
-         newState = RulesEngine.processShotResult(newState, [], false);
-       }
+        // Call RulesEngine.processShotResult with the correct balls
+        if (ballsPottedThisShotRef.current > 0 || cueBallPocketedRef.current) {
+          // Balls were potted - pass them to RulesEngine
+          console.log('Calling RulesEngine.processShotResult with potted balls');
+          newState = RulesEngine.processShotResult(newState, pocketedBallsRef.current, cueBallPocketedRef.current, firstBallHitRef.current);
+        } else {
+          // No balls potted - pass empty array
+          console.log('Calling RulesEngine.processShotResult for no-balls-potted case');
+          newState = RulesEngine.processShotResult(newState, [], false, firstBallHitRef.current);
+        }
        
        // Now handle turn switching based on what happened
        if (ballsPottedThisShotRef.current === 0 && !gameState.foulCommitted) {
