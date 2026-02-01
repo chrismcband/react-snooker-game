@@ -37,6 +37,9 @@ export const CueController: React.FC<CueControllerProps> = ({
   
   // Track which AI shot is currently being executed to prevent double-firing
   const aiShotIdRef = useRef<string | null>(null);
+  
+  // Track initial mouse position when user starts charging
+  const initialMousePosRef = useRef<{ x: number; y: number } | null>(null);
 
    // Use refs to track latest values for the window event listeners to avoid closure issues
    const stateRef = useRef({ isCharging, power, angle, disabled, isAiTurn });
@@ -54,7 +57,7 @@ export const CueController: React.FC<CueControllerProps> = ({
   }, [isAiTurn]);
 
   const handleMouseDown = (e: any) => {
-    console.log('CueController: MouseDown');
+    console.log('CueController: MouseDown (Konva event)');
     if (disabled || isAiTurn) {
       console.log('CueController: Disabled or AI turn', { disabled, isAiTurn });
       return;
@@ -74,6 +77,7 @@ export const CueController: React.FC<CueControllerProps> = ({
     
     setIsCharging(false);
     setPower(0);
+    initialMousePosRef.current = null; // Reset initial position
   }, [disabled, isAiTurn, onShoot]);
 
     // Use window events to capture mouse movement even outside the canvas
@@ -108,20 +112,53 @@ export const CueController: React.FC<CueControllerProps> = ({
       const dx = stageX - cueBallX;
       const dy = stageY - cueBallY;
       
-      if (!isCharging) {
-        // Angle points from cursor TO ball
-        const newAngle = Math.atan2(-dy, -dx);
-        setAngle(newAngle);
-      } else {
-        const maxPower = 30;
-        // aim vector (cursor -> ball)
-        const aimX = Math.cos(currentAngle);
-        const aimY = Math.sin(currentAngle);
-        // pullDist is positive when mouse is pulled AWAY from the ball (opposite of aim)
-        const pullDist = (dx * -aimX + dy * -aimY); 
-        const calculatedPower = Math.min(Math.max(pullDist / 10, 0), maxPower);
-        setPower(calculatedPower);
-      }
+       if (!isCharging) {
+         // Angle points from cursor TO ball
+         const newAngle = Math.atan2(-dy, -dx);
+         setAngle(newAngle);
+       } else if (initialMousePosRef.current) {
+         // Calculate power based on distance from initial mouse position
+         const maxPower = 30;
+         
+         // Calculate distance from initial click position to current position
+         const initialX = initialMousePosRef.current.x;
+         const initialY = initialMousePosRef.current.y;
+         
+         const dragDx = pos.x - initialX;
+         const dragDy = pos.y - initialY;
+         
+         // aim vector (the direction the cue is pointing)
+         const aimX = Math.cos(currentAngle);
+         const aimY = Math.sin(currentAngle);
+         
+         // Project the drag vector onto the aim direction (opposite direction)
+         // Positive pullDist = dragging away from ball (increasing power)
+         const pullDist = (dragDx * -aimX + dragDy * -aimY);
+         
+         // Convert drag distance to power (10 pixels = 1 power unit)
+         const calculatedPower = Math.min(Math.max(pullDist / 10, 0), maxPower);
+         setPower(calculatedPower);
+       }
+    };
+
+    const handleWindowMouseDown = (e: MouseEvent) => {
+      if (stateRef.current.disabled || stateRef.current.isAiTurn || !stageRef.current) return;
+      
+      const container = stageRef.current.container();
+      if (!container) return;
+      
+      const rect = container.getBoundingClientRect();
+      const screenX = e.clientX - rect.left;
+      const screenY = e.clientY - rect.top;
+      
+      // Account for CSS scale and convert to Stage coordinates
+      initialMousePosRef.current = {
+        x: screenX / scale,
+        y: screenY / scale
+      };
+      
+      setIsCharging(true);
+      setPower(0); // Start with 0 power
     };
 
     const handleWindowMouseUp = () => {
@@ -130,10 +167,12 @@ export const CueController: React.FC<CueControllerProps> = ({
       }
     };
 
+    window.addEventListener('mousedown', handleWindowMouseDown);
     window.addEventListener('mousemove', handleWindowMouseMove);
     window.addEventListener('mouseup', handleWindowMouseUp);
 
     return () => {
+      window.removeEventListener('mousedown', handleWindowMouseDown);
       window.removeEventListener('mousemove', handleWindowMouseMove);
       window.removeEventListener('mouseup', handleWindowMouseUp);
     };
