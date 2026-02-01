@@ -36,9 +36,10 @@ export const Game: React.FC = () => {
   const [shotJustEnded, setShotJustEnded] = useState(false);
   const [isAIThinking, setIsAIThinking] = useState(false);
   const [aiShot, setAiShot] = useState<{ angle: number; power: number } | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const stageRef = useRef<any>(null);
-  const aiShotFiredRef = useRef<boolean>(false);
+   const animationFrameRef = useRef<number | null>(null);
+   const stageRef = useRef<any>(null);
+   const containerRef = useRef<HTMLDivElement>(null);
+   const aiShotFiredRef = useRef<boolean>(false);
   const aiShotExecutedRef = useRef<boolean>(false);
   const ballsPottedThisShotRef = useRef<number>(0);
   const shotResultProcessedRef = useRef<boolean>(false);
@@ -47,10 +48,26 @@ export const Game: React.FC = () => {
   const cueBallPocketedRef = useRef<boolean>(false);
   const shotJustEndedRef = useRef<boolean>(false);
 
-  const balls = gameState.balls;
+    const balls = gameState.balls;
+    
+     // Calculate stage dimensions with space for cue rendering
+     const cueRenderingSpace = 100; // Space around table for cue stick rendering
+     // Calculate unscaled Stage dimensions with space for cue rendering
+     const unscaledWidth = TABLE_DIMENSIONS.width + TABLE_DIMENSIONS.frameWidth * 2 + cueRenderingSpace * 2;
+     const unscaledHeight = TABLE_DIMENSIONS.height + TABLE_DIMENSIONS.frameWidth * 2 + cueRenderingSpace * 2;
+    
+    // Scale to fit viewport (leaving room for GameUI)
+    // Viewport is roughly 1920x1080, GameUI takes ~50px, leaving ~1920x1030
+    // We want to fit with some margin
+    const maxViewportWidth = typeof window !== 'undefined' ? window.innerWidth * 0.95 : 1920;
+    const maxViewportHeight = typeof window !== 'undefined' ? (window.innerHeight - 80) * 0.95 : 950;
+    
+     const scaleX = maxViewportWidth / unscaledWidth;
+     const scaleY = maxViewportHeight / unscaledHeight;
+     const scale = Math.min(scaleX, scaleY, 1); // Don't scale up, only down
 
-  // Debug logging
-  useEffect(() => {
+   // Debug logging
+   useEffect(() => {
     console.log('Game State Updated:', {
       currentPlayer: gameState.currentPlayer,
       gamePhase: gameState.gamePhase,
@@ -176,31 +193,50 @@ export const Game: React.FC = () => {
     });
   }, []);
 
-  const cueBallDragBoundFunc = useCallback((pos: { x: number; y: number }) => {
-    const frame = TABLE_DIMENSIONS.frameWidth;
-    const centerX = frame + TABLE_MARKINGS.baulkLineX;
-    const centerY = frame + TABLE_DIMENSIONS.height / 2;
-    const radius = TABLE_MARKINGS.dRadius;
-    
-    let x = pos.x;
-    let y = pos.y;
-    
-    // 1. Clamp x to be on the left side of the baulk line
-    x = Math.min(x, centerX);
-    
-    // 2. Clamp to D semi-circle
-    const dx = x - centerX;
-    const dy = y - centerY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    
-    if (dist > radius) {
-      const ratio = radius / dist;
-      x = centerX + dx * ratio;
-      y = centerY + dy * ratio;
-    }
-    
-    return { x, y };
-  }, []);
+   const cueBallDragBoundFunc = useCallback((pos: { x: number; y: number }) => {
+     // dragBoundFunc receives position in Stage coordinates
+     // We need to convert to Layer coordinates by subtracting the Layer's position
+     const layerX = cueRenderingSpace + TABLE_DIMENSIONS.frameWidth;
+     const layerY = cueRenderingSpace + TABLE_DIMENSIONS.frameWidth;
+     
+     // Convert Stage coords to Layer local coords
+     const localX = pos.x - layerX;
+     const localY = pos.y - layerY;
+     
+     // The D center is relative to the table surface (0,0) in layer coordinates
+     const centerX = TABLE_MARKINGS.baulkLineX;
+     const centerY = TABLE_DIMENSIONS.height / 2;
+     const radius = TABLE_MARKINGS.dRadius;
+     
+     console.log('Drag bound check:', {
+       pos,
+       layerPos: { x: layerX, y: layerY },
+       localPos: { x: localX, y: localY },
+       centerX,
+       centerY,
+       radius,
+     });
+     
+     let x = localX;
+     let y = localY;
+     
+     // 1. Clamp x to be on the left side of the baulk line
+     x = Math.min(x, centerX);
+     
+     // 2. Clamp to D semi-circle
+     const dx = x - centerX;
+     const dy = y - centerY;
+     const dist = Math.sqrt(dx * dx + dy * dy);
+     
+     if (dist > radius) {
+       const ratio = radius / dist;
+       x = centerX + dx * ratio;
+       y = centerY + dy * ratio;
+     }
+     
+     // Convert back to Stage coordinates to return
+     return { x: x + layerX, y: y + layerY };
+   }, []);
 
   // Physics update loop
   const updatePhysics = useCallback(() => {
@@ -397,52 +433,56 @@ export const Game: React.FC = () => {
 
   const cueBall = balls.find(b => b.id === 'cue');
 
-  const isAiTurn = gameState.currentPlayer === 2 && gameState.gamePhase === 'playing';
+   const isAiTurn = gameState.currentPlayer === 2 && gameState.gamePhase === 'playing';
 
-  return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', backgroundColor: '#1a1a1a', display: 'flex', flexDirection: 'column' }}>
-      <GameUI
-        gameState={gameState}
-        onStartGame={handleStartGame}
-        onResetGame={handleResetGame}
-        isAiTurn={isAiTurn}
-      />
+    return (
+     <div style={{ position: 'relative', width: '100vw', height: '100vh', backgroundColor: '#1a1a1a', display: 'flex', flexDirection: 'column' }}>
+       <GameUI
+         gameState={gameState}
+         onStartGame={handleStartGame}
+         onResetGame={handleResetGame}
+         isAiTurn={isAiTurn}
+       />
 
-       <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-         <Stage
-           ref={stageRef}
-           width={TABLE_DIMENSIONS.width + TABLE_DIMENSIONS.frameWidth * 4}
-           height={TABLE_DIMENSIONS.height + TABLE_DIMENSIONS.frameWidth * 4}
-         >
-           <Layer x={TABLE_DIMENSIONS.frameWidth * 2} y={TABLE_DIMENSIONS.frameWidth * 2}>
-             {cueBall && !cueBall.isPocketed && gameState.gamePhase === 'playing' && (
-               <CueController
-                 cueBallX={cueBall.x}
-                 cueBallY={cueBall.y}
-                 onShoot={handleShoot}
-                 disabled={isShotInProgress}
-                 isAiTurn={isAiTurn}
-                 aiShot={aiShot}
-                 stageRef={stageRef}
-               />
-             )}
-           </Layer>
-           <Layer x={TABLE_DIMENSIONS.frameWidth * 3} y={TABLE_DIMENSIONS.frameWidth * 3}>
-             <Table>
-               {balls.map(ball => (
-                 <Ball
-                   key={ball.id}
-                   ball={ball}
-                   onPositionUpdate={handleBallPositionUpdate}
-                   draggable={ball.id === 'cue' && gameState.gamePhase === 'positioning'}
-                   onDragEnd={ball.id === 'cue' ? onCueBallDragEnd : undefined}
-                   dragBoundFunc={ball.id === 'cue' && gameState.gamePhase === 'positioning' ? cueBallDragBoundFunc : undefined}
-                 />
-               ))}
-             </Table>
-           </Layer>
-         </Stage>
-       </div>
-    </div>
+        <div ref={containerRef} style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+          <div style={{ transform: `scale(${scale})` }}>
+            <Stage
+              ref={stageRef}
+              width={unscaledWidth}
+              height={unscaledHeight}
+             >
+              <Layer x={cueRenderingSpace + TABLE_DIMENSIONS.frameWidth} y={cueRenderingSpace + TABLE_DIMENSIONS.frameWidth}>
+               <Table>
+                 {balls.map(ball => (
+                   <Ball
+                     key={ball.id}
+                     ball={ball}
+                     onPositionUpdate={handleBallPositionUpdate}
+                     draggable={ball.id === 'cue' && gameState.gamePhase === 'positioning'}
+                     onDragEnd={ball.id === 'cue' ? onCueBallDragEnd : undefined}
+                     dragBoundFunc={ball.id === 'cue' && gameState.gamePhase === 'positioning' ? cueBallDragBoundFunc : undefined}
+                   />
+                 ))}
+               </Table>
+             </Layer>
+            <Layer x={cueRenderingSpace + TABLE_DIMENSIONS.frameWidth} y={cueRenderingSpace + TABLE_DIMENSIONS.frameWidth}>
+              {cueBall && !cueBall.isPocketed && gameState.gamePhase === 'playing' && (
+                <CueController
+                  cueBallX={cueBall.x}
+                  cueBallY={cueBall.y}
+                  onShoot={handleShoot}
+                  disabled={isShotInProgress}
+                  isAiTurn={isAiTurn}
+                  aiShot={aiShot}
+                  stageRef={stageRef}
+                  scale={scale}
+                  cueRenderingSpace={cueRenderingSpace}
+                />
+              )}
+            </Layer>
+          </Stage>
+          </div>
+        </div>
+     </div>
   );
 };

@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Line, Circle, Group, Rect } from 'react-konva';
 import { BALL_PROPERTIES, TABLE_DIMENSIONS } from '../utils/constants';
 
+// Space allocated on each side of the table for cue stick rendering
+const CUE_RENDERING_SPACE = 300;
+
 interface CueControllerProps {
   cueBallX: number;
   cueBallY: number;
@@ -10,6 +13,8 @@ interface CueControllerProps {
   isAiTurn?: boolean;
   aiShot?: { angle: number; power: number } | null;
   stageRef: React.RefObject<any>;
+  scale?: number;
+  cueRenderingSpace?: number;
 }
 
 export const CueController: React.FC<CueControllerProps> = ({
@@ -20,6 +25,8 @@ export const CueController: React.FC<CueControllerProps> = ({
   isAiTurn = false,
   aiShot = null,
   stageRef,
+  scale = 1,
+  cueRenderingSpace = 300,
 }) => {
   const [isCharging, setIsCharging] = useState(false);
   const [power, setPower] = useState(0);
@@ -31,11 +38,11 @@ export const CueController: React.FC<CueControllerProps> = ({
   // Track which AI shot is currently being executed to prevent double-firing
   const aiShotIdRef = useRef<string | null>(null);
 
-  // Use refs to track latest values for the window event listeners to avoid closure issues
-  const stateRef = useRef({ isCharging, power, angle, disabled, isAiTurn });
-  useEffect(() => {
-    stateRef.current = { isCharging, power, angle, disabled, isAiTurn };
-  }, [isCharging, power, angle, disabled, isAiTurn]);
+   // Use refs to track latest values for the window event listeners to avoid closure issues
+   const stateRef = useRef({ isCharging, power, angle, disabled, isAiTurn });
+   useEffect(() => {
+     stateRef.current = { isCharging, power, angle, disabled, isAiTurn };
+   }, [isCharging, power, angle, disabled, isAiTurn]);
 
   // Reset controller state when it's no longer AI turn (turn switched to player)
   useEffect(() => {
@@ -69,24 +76,34 @@ export const CueController: React.FC<CueControllerProps> = ({
     setPower(0);
   }, [disabled, isAiTurn, onShoot]);
 
-   // Use window events to capture mouse movement even outside the canvas
-  useEffect(() => {
-    const handleWindowMouseMove = (e: MouseEvent) => {
-      const { disabled, isAiTurn, isCharging, angle: currentAngle } = stateRef.current;
-      // Don't process mouse move if disabled or it's AI turn
-      if (disabled || isAiTurn || !stageRef.current) return;
-      
-      const container = stageRef.current.container();
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      
-      const pos = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      };
-      
-      const stageX = pos.x - TABLE_DIMENSIONS.frameWidth;
-      const stageY = pos.y - TABLE_DIMENSIONS.frameWidth;
+    // Use window events to capture mouse movement even outside the canvas
+    useEffect(() => {
+      const handleWindowMouseMove = (e: MouseEvent) => {
+        const { disabled, isAiTurn, isCharging, angle: currentAngle } = stateRef.current;
+        // Don't process mouse move if disabled or it's AI turn
+        if (disabled || isAiTurn || !stageRef.current) return;
+        
+        const container = stageRef.current.container();
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        
+        // Get mouse position relative to container
+        const screenX = e.clientX - rect.left;
+        const screenY = e.clientY - rect.top;
+        
+        // The parent div has a CSS scale transform, so we need to account for that
+        // Unscale the coordinates to get Stage coordinates
+        const pos = {
+          x: screenX / scale,
+          y: screenY / scale
+        };
+        
+        // Convert from Stage coordinates to Layer coordinates
+        // The layer is positioned at (cueRenderingSpace + frameWidth) in Stage coords
+        const layerX = cueRenderingSpace + TABLE_DIMENSIONS.frameWidth;
+        const layerY = cueRenderingSpace + TABLE_DIMENSIONS.frameWidth;
+        const stageX = pos.x - layerX;
+        const stageY = pos.y - layerY;
       
       const dx = stageX - cueBallX;
       const dy = stageY - cueBallY;
@@ -120,7 +137,7 @@ export const CueController: React.FC<CueControllerProps> = ({
       window.removeEventListener('mousemove', handleWindowMouseMove);
       window.removeEventListener('mouseup', handleWindowMouseUp);
     };
-  }, [cueBallX, cueBallY, onShoot, stageRef, handleMouseUpLocal]);
+  }, [cueBallX, cueBallY, onShoot, stageRef, handleMouseUpLocal, scale, cueRenderingSpace]);
 
    // AI Animation Logic
    useEffect(() => {
@@ -184,18 +201,32 @@ export const CueController: React.FC<CueControllerProps> = ({
 
    const { startX: cueStartX, startY: cueStartY, endX: cueEndX, endY: cueEndY } = getCueStickPosition();
 
-    return (
-     <Group>
-       {/* Hit area - covers entire stage to allow interaction beyond table bounds */}
-       <Rect
-         x={-TABLE_DIMENSIONS.frameWidth}
-         y={-TABLE_DIMENSIONS.frameWidth}
-         width={TABLE_DIMENSIONS.width + TABLE_DIMENSIONS.frameWidth * 4}
-         height={TABLE_DIMENSIONS.height + TABLE_DIMENSIONS.frameWidth * 4}
-         fill="rgba(0,0,0,0)"
-         onMouseDown={handleMouseDown}
-         listening={!disabled && !isAiTurn}
-       />
+     return (
+      <Group>
+        {/* DEBUG: Show hit area bounds */}
+         {process.env.NODE_ENV === 'development' && (
+           <Rect
+             x={-CUE_RENDERING_SPACE - TABLE_DIMENSIONS.frameWidth}
+             y={-CUE_RENDERING_SPACE - TABLE_DIMENSIONS.frameWidth}
+             width={TABLE_DIMENSIONS.width + (TABLE_DIMENSIONS.frameWidth + CUE_RENDERING_SPACE) * 2}
+             height={TABLE_DIMENSIONS.height + (TABLE_DIMENSIONS.frameWidth + CUE_RENDERING_SPACE) * 2}
+             fill="rgba(0,0,0,0)"
+             stroke="rgba(255,255,255,0.1)"
+             strokeWidth={1}
+             listening={false}
+           />
+         )}
+
+         {/* Hit area - covers entire stage including area beyond table for cue rendering */}
+         <Rect
+           x={-CUE_RENDERING_SPACE - TABLE_DIMENSIONS.frameWidth}
+           y={-CUE_RENDERING_SPACE - TABLE_DIMENSIONS.frameWidth}
+           width={TABLE_DIMENSIONS.width + (TABLE_DIMENSIONS.frameWidth + CUE_RENDERING_SPACE) * 2}
+           height={TABLE_DIMENSIONS.height + (TABLE_DIMENSIONS.frameWidth + CUE_RENDERING_SPACE) * 2}
+          fill="rgba(0,0,0,0)"
+          onMouseDown={handleMouseDown}
+          listening={!disabled && !isAiTurn}
+        />
 
       {!disabled && (
         <Line
