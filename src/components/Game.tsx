@@ -408,39 +408,41 @@ export const Game: React.FC = () => {
         isAiTurn={isAiTurn}
       />
 
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-        <Stage
-          ref={stageRef}
-          width={TABLE_DIMENSIONS.width + TABLE_DIMENSIONS.frameWidth * 2}
-          height={TABLE_DIMENSIONS.height + TABLE_DIMENSIONS.frameWidth * 2}
-        >
-          <Layer x={TABLE_DIMENSIONS.frameWidth} y={TABLE_DIMENSIONS.frameWidth}>
-            <Table>
-              {balls.map(ball => (
-                <Ball
-                  key={ball.id}
-                  ball={ball}
-                  onPositionUpdate={handleBallPositionUpdate}
-                  draggable={ball.id === 'cue' && gameState.gamePhase === 'positioning'}
-                  onDragEnd={ball.id === 'cue' ? onCueBallDragEnd : undefined}
-                  dragBoundFunc={ball.id === 'cue' && gameState.gamePhase === 'positioning' ? cueBallDragBoundFunc : undefined}
-                />
-              ))}
-              {cueBall && !cueBall.isPocketed && gameState.gamePhase === 'playing' && (
-                <CueController
-                  cueBallX={cueBall.x}
-                  cueBallY={cueBall.y}
-                  onShoot={handleShoot}
-                  disabled={isShotInProgress}
-                  isAiTurn={isAiTurn}
-                  aiShot={aiShot}
-                  stageRef={stageRef}
-                />
-              )}
-            </Table>
-          </Layer>
-        </Stage>
-      </div>
+       <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+         <Stage
+           ref={stageRef}
+           width={TABLE_DIMENSIONS.width + TABLE_DIMENSIONS.frameWidth * 2}
+           height={TABLE_DIMENSIONS.height + TABLE_DIMENSIONS.frameWidth * 2}
+         >
+           <Layer>
+             {cueBall && !cueBall.isPocketed && gameState.gamePhase === 'playing' && (
+               <CueController
+                 cueBallX={cueBall.x + TABLE_DIMENSIONS.frameWidth}
+                 cueBallY={cueBall.y + TABLE_DIMENSIONS.frameWidth}
+                 onShoot={handleShoot}
+                 disabled={isShotInProgress}
+                 isAiTurn={isAiTurn}
+                 aiShot={aiShot}
+                 stageRef={stageRef}
+               />
+             )}
+           </Layer>
+           <Layer x={TABLE_DIMENSIONS.frameWidth} y={TABLE_DIMENSIONS.frameWidth}>
+             <Table>
+               {balls.map(ball => (
+                 <Ball
+                   key={ball.id}
+                   ball={ball}
+                   onPositionUpdate={handleBallPositionUpdate}
+                   draggable={ball.id === 'cue' && gameState.gamePhase === 'positioning'}
+                   onDragEnd={ball.id === 'cue' ? onCueBallDragEnd : undefined}
+                   dragBoundFunc={ball.id === 'cue' && gameState.gamePhase === 'positioning' ? cueBallDragBoundFunc : undefined}
+                 />
+               ))}
+             </Table>
+           </Layer>
+         </Stage>
+       </div>
     </div>
   );
 };

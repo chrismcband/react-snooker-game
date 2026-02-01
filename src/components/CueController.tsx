@@ -184,18 +184,18 @@ export const CueController: React.FC<CueControllerProps> = ({
 
   const { startX: cueStartX, startY: cueStartY, endX: cueEndX, endY: cueEndY } = getCueStickPosition();
 
-  return (
-    <Group>
-      {/* Hit area */}
-      <Rect
-        x={-TABLE_DIMENSIONS.frameWidth}
-        y={-TABLE_DIMENSIONS.frameWidth}
-        width={TABLE_DIMENSIONS.width + TABLE_DIMENSIONS.frameWidth * 2}
-        height={TABLE_DIMENSIONS.height + TABLE_DIMENSIONS.frameWidth * 2}
-        fill="rgba(0,0,0,0)"
-        onMouseDown={handleMouseDown}
-        listening={!disabled && !isAiTurn}
-      />
+   return (
+     <Group>
+       {/* Hit area - covers entire stage to allow interaction beyond table bounds */}
+       <Rect
+         x={0}
+         y={0}
+         width={TABLE_DIMENSIONS.width + TABLE_DIMENSIONS.frameWidth * 2}
+         height={TABLE_DIMENSIONS.height + TABLE_DIMENSIONS.frameWidth * 2}
+         fill="rgba(0,0,0,0)"
+         onMouseDown={handleMouseDown}
+         listening={!disabled && !isAiTurn}
+       />
 
       {!disabled && (
         <Line
