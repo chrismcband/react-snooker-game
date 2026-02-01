@@ -140,34 +140,37 @@ export const Game: React.FC = () => {
      }
    }, [isAIThinking, gameState, aiShot]);
 
-  const handleShoot = useCallback((power: number, angle: number) => {
-    console.log('handleShoot called:', { power, angle, isShotInProgress, gamePhase: gameState.gamePhase, currentPlayer: gameState.currentPlayer });
-    
-    if (isShotInProgress || (gameState.gamePhase !== 'playing')) {
-      console.log('handleShoot IGNORED - isShotInProgress or not playing');
-      return;
-    }
+   const handleShoot = useCallback((power: number, angle: number) => {
+     console.log('handleShoot called:', { power, angle, isShotInProgress, gamePhase: gameState.gamePhase, currentPlayer: gameState.currentPlayer });
+     
+     if (isShotInProgress || (gameState.gamePhase !== 'playing')) {
+       console.log('handleShoot IGNORED - isShotInProgress or not playing');
+       return;
+     }
 
-    // Mark if this is an AI shot
-    const isAiShooting = gameState.currentPlayer === 2;
-    if (isAiShooting) {
-      console.log('✓ AI executing shot via handleShoot - marking aiShotExecutedRef = true');
-      aiShotExecutedRef.current = true;
-    } else {
-      console.log('✓ Player executing shot via handleShoot');
-    }
+     // Mark if this is an AI shot
+     const isAiShooting = gameState.currentPlayer === 2;
+     if (isAiShooting) {
+       console.log('✓ AI executing shot via handleShoot - marking aiShotExecutedRef = true');
+       aiShotExecutedRef.current = true;
+     } else {
+       console.log('✓ Player executing shot via handleShoot');
+     }
 
-    setGameState(prev => {
-      const newBalls = prev.balls.map(b => ({ ...b }));
-      const cueBall = newBalls.find(b => b.id === 'cue');
+     setGameState(prev => {
+       const newBalls = prev.balls.map(b => ({ ...b }));
+       const cueBall = newBalls.find(b => b.id === 'cue');
 
-      if (cueBall) {
-        cueBall.vx = Math.cos(angle) * power;
-        cueBall.vy = Math.sin(angle) * power;
-      }
+       if (cueBall) {
+         cueBall.vx = Math.cos(angle) * power;
+         cueBall.vy = Math.sin(angle) * power;
+         console.log('[handleShoot] Set cue ball velocity:', { vx: cueBall.vx, vy: cueBall.vy, power, angle });
+       } else {
+         console.log('[handleShoot] ERROR: Cue ball not found!');
+       }
 
-      return { ...prev, balls: newBalls };
-    });
+       return { ...prev, balls: newBalls };
+     });
 
      setIsShotInProgress(true);
      shotJustEndedRef.current = false;  // Reset for new shot
@@ -350,10 +353,6 @@ export const Game: React.FC = () => {
 
        return nextState;
     });
-
-    if (isShotInProgress) {
-      animationFrameRef.current = requestAnimationFrame(updatePhysics);
-    }
   }, [isShotInProgress]);
 
   useEffect(() => {
