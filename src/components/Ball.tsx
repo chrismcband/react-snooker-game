@@ -7,9 +7,10 @@ interface BallProps {
   onPositionUpdate?: (id: string, x: number, y: number) => void;
   draggable?: boolean;
   onDragEnd?: () => void;
+  dragBoundFunc?: (pos: { x: number; y: number }) => { x: number; y: number };
 }
 
-export const Ball: React.FC<BallProps> = ({ ball, onPositionUpdate, draggable = false, onDragEnd }) => {
+export const Ball: React.FC<BallProps> = ({ ball, onPositionUpdate, draggable = false, onDragEnd, dragBoundFunc }) => {
   const handleDrag = (e: any) => {
     const newX = e.target.x();
     const newY = e.target.y();
@@ -43,6 +44,7 @@ export const Ball: React.FC<BallProps> = ({ ball, onPositionUpdate, draggable = 
       draggable={draggable} 
       onDragMove={handleDrag}
       onDragEnd={handleDragEnd}
+      dragBoundFunc={dragBoundFunc}
       visible={!ball.isPocketed}
     />
   );

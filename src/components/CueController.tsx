@@ -42,13 +42,18 @@ export const CueController: React.FC<CueControllerProps> = ({
     const dy = stageY - cueBallY;
     
     if (!isCharging) {
-      const newAngle = Math.atan2(dy, dx);
+      // Angle points from cursor TO ball
+      const newAngle = Math.atan2(-dy, -dx);
       setAngle(newAngle);
     } else {
       const maxPower = 30;
+      // aim vector (cursor -> ball)
       const aimX = Math.cos(angle);
       const aimY = Math.sin(angle);
-      const pullDist = -(dx * aimX + dy * aimY); 
+      // pullDist is positive when mouse is pulled AWAY from the ball (opposite of aim)
+      // Vector ball -> cursor is (dx, dy)
+      // Dot product of (dx, dy) and (-aimX, -aimY)
+      const pullDist = (dx * -aimX + dy * -aimY); 
       const calculatedPower = Math.min(Math.max(pullDist / 10, 0), maxPower);
       setPower(calculatedPower);
     }

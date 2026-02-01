@@ -50,7 +50,7 @@ export const Game: React.FC = () => {
       const y = TABLE_DIMENSIONS.height / 2;
       
       setGameState(prev => {
-        const newBalls = prev.balls.map(b => b.id === 'cue' ? { ...b, x, y } : b);
+        const newBalls = prev.balls.map(b => b.id === 'cue' ? { ...b, x, y, isPocketed: false } : b);
         return { ...prev, balls: newBalls, gamePhase: 'playing' };
       });
       return;
@@ -93,31 +93,6 @@ export const Game: React.FC = () => {
     if (isShotInProgress) return; 
     
     setGameState(prev => {
-      // Constraint for cue ball positioning in D
-      if (id === 'cue' && prev.gamePhase === 'positioning') {
-        const centerX = TABLE_MARKINGS.baulkLineX;
-        const centerY = TABLE_DIMENSIONS.height / 2;
-        const dx = x - centerX;
-        const dy = y - centerY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        let clampedX = x;
-        let clampedY = y;
-        
-        if (dist > TABLE_MARKINGS.dRadius) {
-          const angle = Math.atan2(dy, dx);
-          clampedX = centerX + Math.cos(angle) * TABLE_MARKINGS.dRadius;
-          clampedY = centerY + Math.sin(angle) * TABLE_MARKINGS.dRadius;
-        }
-        
-        if (clampedX > TABLE_MARKINGS.baulkLineX) {
-          clampedX = TABLE_MARKINGS.baulkLineX;
-        }
-        
-        const newBalls = prev.balls.map(ball => ball.id === id ? { ...ball, x: clampedX, y: clampedY } : ball);
-        return { ...prev, balls: newBalls };
-      }
-
       const newBalls = prev.balls.map(ball => ball.id === id ? { ...ball, x, y } : ball);
       return { ...prev, balls: newBalls };
     });
@@ -130,6 +105,37 @@ export const Game: React.FC = () => {
       }
       return prev;
     });
+  }, []);
+
+  const cueBallDragBoundFunc = useCallback((pos: { x: number; y: number }) => {
+    const frame = TABLE_DIMENSIONS.frameWidth;
+    const centerX = frame + TABLE_MARKINGS.baulkLineX;
+    const centerY = frame + TABLE_DIMENSIONS.height / 2;
+    const radius = TABLE_MARKINGS.dRadius;
+    
+    // Convert absolute pos to relative to table start (which is at frame, frame)
+    let relX = pos.x - frame;
+    let relY = pos.y - frame;
+    
+    // 1. Clamp x to be on the left side of the baulk line (relX <= baulkLineX)
+    relX = Math.min(relX, TABLE_MARKINGS.baulkLineX);
+    
+    // 2. Clamp to D semi-circle
+    const dx = (relX + frame) - centerX;
+    const dy = (relY + frame) - centerY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist > radius) {
+      const ratio = radius / dist;
+      relX = (centerX - frame) + dx * ratio;
+      relY = (centerY - frame) + dy * ratio;
+    }
+    
+    // Return absolute position
+    return { 
+      x: relX + frame, 
+      y: relY + frame 
+    };
   }, []);
 
   // Physics update loop
@@ -280,6 +286,7 @@ export const Game: React.FC = () => {
                   onPositionUpdate={handleBallPositionUpdate}
                   draggable={ball.id === 'cue' && gameState.gamePhase === 'positioning'}
                   onDragEnd={ball.id === 'cue' ? onCueBallDragEnd : undefined}
+                  dragBoundFunc={ball.id === 'cue' && gameState.gamePhase === 'positioning' ? cueBallDragBoundFunc : undefined}
                 />
               ))}
               {cueBall && !cueBall.isPocketed && gameState.gamePhase === 'playing' && (

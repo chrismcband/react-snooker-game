@@ -108,7 +108,7 @@ export class RulesEngine {
       // Handle cue ball if pocketed
       if (cueBallPocketed) {
         newState.balls = newState.balls.map(b =>
-          b.id === 'cue' ? { ...b, isPocketed: false, x: 200, y: 200, vx: 0, vy: 0 } : b
+          b.id === 'cue' ? { ...b, isPocketed: false, x: 100, y: 200, vx: 0, vy: 0 } : b
         );
         newState.gamePhase = 'positioning';
       } else {
