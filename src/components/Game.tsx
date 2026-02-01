@@ -45,6 +45,7 @@ export const Game: React.FC = () => {
   const ballsPottedCounterRef = useRef<number>(0);
   const pocketedBallsRef = useRef<BallType[]>([]);
   const cueBallPocketedRef = useRef<boolean>(false);
+  const shotJustEndedRef = useRef<boolean>(false);
 
   const balls = gameState.balls;
 
@@ -147,6 +148,8 @@ export const Game: React.FC = () => {
     });
 
     setIsShotInProgress(true);
+    shotJustEndedRef.current = false;  // Reset for new shot
+    
     // Clear AI shot only after the physics simulation starts
     // This prevents the animation from being re-triggered
     setTimeout(() => {
@@ -265,7 +268,9 @@ export const Game: React.FC = () => {
          }
 
            // Stop animation when all balls have stopped
-           if (!anyBallsMoving) {
+           if (!anyBallsMoving && !shotJustEndedRef.current) {
+             shotJustEndedRef.current = true;
+             
              // Track how many balls were potted this shot for turn logic
              ballsPottedThisShotRef.current = ballsPottedCounterRef.current;
              console.log('Shot ended - balls potted this shot:', ballsPottedThisShotRef.current, 'current player:', prev.currentPlayer);
