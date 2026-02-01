@@ -219,21 +219,23 @@ export class RulesEngine {
             const redsPotted = pottedBalls.filter(b => b.type === 'red').length;
             newState.redsRemaining = Math.max(0, state.redsRemaining - redsPotted);
             newState.nextRequiredType = 'any-color';
-         } else {
-           // A color was potted
-           if (state.redsRemaining > 0) {
-             newState.nextRequiredType = 'red';
-             // Return color to spot (snooker rule: colors return after being potted in red phase)
-             pottedBalls.forEach(ball => {
-               newState.balls = newState.balls.map(b => 
-                 b.id === ball.id ? { ...b, isPocketed: false } : b
-               );
-             });
-           } else {
-             // No reds remaining - must pot colors in sequence
-             newState.nextRequiredType = this.getNextColorInSequence(newState, pottedBalls[0]);
-           }
-         }
+          } else {
+            // A color was potted
+            if (state.redsRemaining > 0) {
+              newState.nextRequiredType = 'red';
+              // Return color to spot (snooker rule: colors return after being potted in red phase)
+              pottedBalls.forEach(ball => {
+                const colorSpots = TABLE_MARKINGS.colorSpots as Record<string, { x: number; y: number }>;
+                const spot = colorSpots[ball.id];
+                newState.balls = newState.balls.map(b => 
+                  b.id === ball.id && spot ? { ...b, isPocketed: false, x: spot.x, y: spot.y, vx: 0, vy: 0 } : b
+                );
+              });
+            } else {
+              // No reds remaining - must pot colors in sequence
+              newState.nextRequiredType = this.getNextColorInSequence(newState, pottedBalls[0]);
+            }
+          }
        } else {
          // No balls potted - switch turns
          const newPlayer = state.currentPlayer === 1 ? 2 : 1;

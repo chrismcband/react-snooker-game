@@ -324,5 +324,61 @@ describe('RulesEngine', () => {
       expect(newState.nextRequiredType).toBe('red'); // Back to red
       expect(newState.foulCommitted).toBe(false);
     });
+
+    it('should restore color to its spot when potted during red phase', () => {
+      const state = createTestGameState({ nextRequiredType: 'any-color', currentPlayer: 1, redsRemaining: 10 });
+      const blackBall = createTestBall({ id: 'black', type: 'color', color: '#000000', pointValue: 7, isPocketed: true });
+      
+      // Player 1 pots black (valid shot during color phase)
+      const newState = RulesEngine.processShotResult(state, [blackBall], false, blackBall);
+      
+      // Find the black ball in the new state
+      const restoredBlack = newState.balls.find(b => b.id === 'black');
+      
+      expect(restoredBlack).toBeDefined();
+      expect(restoredBlack?.isPocketed).toBe(false);
+      // Black should be at its spot position
+      expect(restoredBlack?.x).toBeCloseTo(728.17, 1); // Black spot X
+      expect(restoredBlack?.y).toBeCloseTo(200, 1); // Black spot Y
+      expect(restoredBlack?.vx).toBe(0);
+      expect(restoredBlack?.vy).toBe(0);
+    });
+
+    it('should restore all potted colors to their spots during red phase', () => {
+      const state = createTestGameState({ nextRequiredType: 'any-color', currentPlayer: 1, redsRemaining: 10 });
+      const yellowBall = createTestBall({ id: 'yellow', type: 'color', color: '#FFCC00', pointValue: 2, isPocketed: true });
+      
+      // Player 1 pots yellow (valid shot during color phase)
+      const newState = RulesEngine.processShotResult(state, [yellowBall], false, yellowBall);
+      
+      // Find the yellow ball in the new state
+      const restoredYellow = newState.balls.find(b => b.id === 'yellow');
+      
+      expect(restoredYellow).toBeDefined();
+      expect(restoredYellow?.isPocketed).toBe(false);
+      // Yellow should be at its spot position (lower D position)
+      expect(restoredYellow?.x).toBeCloseTo(163.38, 1);
+      expect(restoredYellow?.y).toBeCloseTo(264.79, 1);
+    });
+
+    it('should NOT restore color when no reds remain (end game phase)', () => {
+      const state = createTestGameState({ nextRequiredType: 'black', currentPlayer: 1, redsRemaining: 0 });
+      // First modify the state to have black ball pocketed already (from previous potting)
+      const stateWithBallPotted = {
+        ...state,
+        balls: state.balls.map(b => b.id === 'black' ? { ...b, isPocketed: true } : b),
+      };
+      
+      const blackBall = createTestBall({ id: 'black', type: 'color', color: '#000000', pointValue: 7, isPocketed: false });
+      
+      // Player 1 pots black in color sequence (no reds left) - using stateWithBallPotted as input
+      const newState = RulesEngine.processShotResult(stateWithBallPotted, [blackBall], false, blackBall);
+      
+      // Find the black ball in the new state
+      const pottedBlack = newState.balls.find(b => b.id === 'black');
+      
+      // Black should remain pocketed (not restored)
+      expect(pottedBlack?.isPocketed).toBe(true);
+    });
   });
 });
