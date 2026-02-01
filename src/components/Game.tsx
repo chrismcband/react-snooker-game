@@ -512,13 +512,13 @@ export const Game: React.FC = () => {
             </div>
          </div>
 
-        {foulNotification && (
-          <FoulNotification
-            foulMessage={foulNotification}
-            onDismiss={() => setFoulNotification(null)}
-            displayDuration={5000}
-          />
-        )}
+      {foulNotification && (
+        <FoulNotification
+          foulMessage={foulNotification}
+          onDismiss={() => setFoulNotification(null)}
+          displayDuration={3000}
+        />
+      )}
       </>
     );
 };
