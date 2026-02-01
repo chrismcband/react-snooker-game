@@ -38,6 +38,7 @@ export const Game: React.FC = () => {
   const [aiShot, setAiShot] = useState<{ angle: number; power: number } | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const stageRef = useRef<any>(null);
+  const aiShotFiredRef = useRef<boolean>(false);
 
   const balls = gameState.balls;
 
@@ -73,7 +74,8 @@ export const Game: React.FC = () => {
        gameState.currentPlayer === 2 &&
        !isShotInProgress &&
        !isAIThinking &&
-       !aiShot
+       !aiShot &&
+       !aiShotFiredRef.current  // Only trigger if we haven't already fired a shot this turn
      ) {
        setIsAIThinking(true);
        console.log('AI thinking, will calculate shot in 1s');
@@ -84,6 +86,7 @@ export const Game: React.FC = () => {
          const shot = AIEngine.calculateShot(gameState);
          if (shot) {
            console.log('AI shot calculated:', shot);
+           aiShotFiredRef.current = true;
            setAiShot(shot);
          }
          setIsAIThinking(false);
@@ -266,18 +269,29 @@ export const Game: React.FC = () => {
 
     // Handle AI turn completion and switch back to player
     useEffect(() => {
-     // Only trigger this when shot has completed (isShotInProgress becomes false) and it was an AI turn
-     if (!isShotInProgress && gameState.currentPlayer === 2 && gameState.gamePhase === 'playing' && !aiShot && !isAIThinking) {
+     // Only switch back to player 1 when:
+     // 1. AI shot has been fired (aiShotFiredRef.current === true)
+     // 2. Shot is no longer in progress (all balls stopped)
+     // 3. AI is not thinking anymore
+     // 4. Current player is still 2
+     if (
+       aiShotFiredRef.current &&
+       !isShotInProgress &&
+       gameState.currentPlayer === 2 &&
+       gameState.gamePhase === 'playing' &&
+       !isAIThinking
+     ) {
        // AI shot has completed and physics simulation is done
        // Switch turn back to player 1
        console.log('Switching turn from AI (player 2) back to Player 1');
+       aiShotFiredRef.current = false;  // Reset for next AI turn
        setGameState(prev => ({
          ...prev,
          currentPlayer: 1,
          gamePhase: 'playing',
        }));
      }
-   }, [isShotInProgress, gameState.currentPlayer, gameState.gamePhase, aiShot, isAIThinking]);
+    }, [isShotInProgress, gameState.currentPlayer, gameState.gamePhase, isAIThinking]);
 
   const handleStartGame = () => {
     setGameState(prev => ({ ...prev, gamePhase: 'positioning' }));
