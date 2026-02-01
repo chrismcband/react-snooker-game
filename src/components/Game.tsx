@@ -340,10 +340,12 @@ export const Game: React.FC = () => {
        // Balls were potted or foul committed - same player gets another turn
        console.log(`Shot completed - ${ballsPottedThisShotRef.current > 0 ? 'balls potted' : 'foul committed'}. Player ${gameState.currentPlayer} keeps their turn`);
        
-       // Reset refs for next shot
+       // Reset both refs so the player can shoot again
+       // This allows AI to calculate and take another shot if it's still their turn
        aiShotFiredRef.current = false;
        aiShotExecutedRef.current = false;
        ballsPottedThisShotRef.current = 0;
+       console.log('Refs reset - player can shoot again');
      }
     }, [isShotInProgress, gameState.currentPlayer, gameState.gamePhase, gameState.foulCommitted]);
 
