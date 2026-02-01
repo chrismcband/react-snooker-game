@@ -52,9 +52,37 @@ export const TABLE_MARKINGS = {
   pinkSpotX: TABLE_DIMENSIONS.width * 0.75,
   pinkSpotY: TABLE_DIMENSIONS.height * 0.5,
   
-  // Black spot: 12.75 inches from top cushion
-  blackSpotX: TABLE_DIMENSIONS.width * (1 - 12.75 / 142),
-  blackSpotY: TABLE_DIMENSIONS.height * 0.5,
+   // Black spot: 12.75 inches from top cushion
+   blackSpotX: TABLE_DIMENSIONS.width * (1 - 12.75 / 142),
+   blackSpotY: TABLE_DIMENSIONS.height * 0.5,
+   
+   // Color spots (for restoration after fouls)
+   colorSpots: {
+     yellow: {
+       x: TABLE_DIMENSIONS.width * (29 / 142),
+       y: TABLE_DIMENSIONS.height * 0.5 + (TABLE_DIMENSIONS.width * (11.5 / 142)),
+     },
+     green: {
+       x: TABLE_DIMENSIONS.width * (29 / 142),
+       y: TABLE_DIMENSIONS.height * 0.5 - (TABLE_DIMENSIONS.width * (11.5 / 142)),
+     },
+     brown: {
+       x: TABLE_DIMENSIONS.width * (29 / 142),
+       y: TABLE_DIMENSIONS.height * 0.5,
+     },
+     blue: {
+       x: TABLE_DIMENSIONS.width * 0.5,
+       y: TABLE_DIMENSIONS.height * 0.5,
+     },
+     pink: {
+       x: TABLE_DIMENSIONS.width * 0.75,
+       y: TABLE_DIMENSIONS.height * 0.5,
+     },
+     black: {
+       x: TABLE_DIMENSIONS.width * (1 - 12.75 / 142),
+       y: TABLE_DIMENSIONS.height * 0.5,
+     },
+   },
 };
 
 // Pocket positions

@@ -3,6 +3,26 @@ import { GameState } from './ScoreSystem';
 import { Ball } from '../types/Ball';
 import { createInitialBalls } from '../utils/gameSetup';
 
+// Helper function to create a test ball
+function createTestBall(overrides?: Partial<Ball>): Ball {
+  return {
+    id: 'test-ball',
+    x: 300,
+    y: 200,
+    vx: 0,
+    vy: 0,
+    type: 'red',
+    isPocketed: false,
+    radius: 8.25,
+    color: '#CC0000',
+    pointValue: 1,
+    spinX: 0,
+    spinY: 0,
+    spinZ: 0,
+    ...overrides,
+  };
+}
+
 // Helper function to create a test game state
 function createTestGameState(overrides?: Partial<GameState>): GameState {
   const initialBalls = createInitialBalls();
@@ -58,16 +78,7 @@ describe('RulesEngine', () => {
     describe('Foul: Wrong ball hit', () => {
       it('should return foul when hitting wrong color instead of red', () => {
         const state = createTestGameState({ nextRequiredType: 'red' });
-        const yellowBall: Ball = {
-          id: 'yellow',
-          x: 300,
-          y: 200,
-          vx: 0,
-          vy: 0,
-          type: 'color',
-          isPocketed: false,
-          radius: 8.25,
-        };
+        const yellowBall = createTestBall({ id: 'yellow', type: 'color', color: '#FFCC00' });
         
         const result = RulesEngine.validateShot(state, [], false, yellowBall);
         
@@ -78,16 +89,7 @@ describe('RulesEngine', () => {
 
       it('should return foul when hitting red instead of specific color', () => {
         const state = createTestGameState({ nextRequiredType: 'yellow' });
-        const redBall: Ball = {
-          id: 'red-1',
-          x: 300,
-          y: 200,
-          vx: 0,
-          vy: 0,
-          type: 'red',
-          isPocketed: false,
-          radius: 8.25,
-        };
+        const redBall = createTestBall({ id: 'red-1', type: 'red' });
         
         const result = RulesEngine.validateShot(state, [], false, redBall);
         
@@ -98,16 +100,7 @@ describe('RulesEngine', () => {
 
       it('should return foul when must hit color but hits red', () => {
         const state = createTestGameState({ nextRequiredType: 'any-color' });
-        const redBall: Ball = {
-          id: 'red-1',
-          x: 300,
-          y: 200,
-          vx: 0,
-          vy: 0,
-          type: 'red',
-          isPocketed: false,
-          radius: 8.25,
-        };
+        const redBall = createTestBall({ id: 'red-1', type: 'red' });
         
         const result = RulesEngine.validateShot(state, [], false, redBall);
         
@@ -120,16 +113,7 @@ describe('RulesEngine', () => {
     describe('Valid shots', () => {
       it('should allow hitting red when on red phase', () => {
         const state = createTestGameState({ nextRequiredType: 'red' });
-        const redBall: Ball = {
-          id: 'red-1',
-          x: 300,
-          y: 200,
-          vx: 0,
-          vy: 0,
-          type: 'red',
-          isPocketed: false,
-          radius: 8.25,
-        };
+        const redBall = createTestBall({ id: 'red-1', type: 'red' });
         
         const result = RulesEngine.validateShot(state, [], false, redBall);
         
@@ -138,16 +122,7 @@ describe('RulesEngine', () => {
 
       it('should allow hitting any color when on color phase', () => {
         const state = createTestGameState({ nextRequiredType: 'any-color' });
-        const yellowBall: Ball = {
-          id: 'yellow',
-          x: 300,
-          y: 200,
-          vx: 0,
-          vy: 0,
-          type: 'color',
-          isPocketed: false,
-          radius: 8.25,
-        };
+        const yellowBall = createTestBall({ id: 'yellow', type: 'color', color: '#FFCC00' });
         
         const result = RulesEngine.validateShot(state, [], false, yellowBall);
         
@@ -156,16 +131,7 @@ describe('RulesEngine', () => {
 
       it('should allow hitting specific color in sequence', () => {
         const state = createTestGameState({ nextRequiredType: 'green' });
-        const greenBall: Ball = {
-          id: 'green',
-          x: 300,
-          y: 200,
-          vx: 0,
-          vy: 0,
-          type: 'color',
-          isPocketed: false,
-          radius: 8.25,
-        };
+        const greenBall = createTestBall({ id: 'green', type: 'color', color: '#00CC00' });
         
         const result = RulesEngine.validateShot(state, [], false, greenBall);
         
@@ -176,16 +142,7 @@ describe('RulesEngine', () => {
     describe('Potting balls', () => {
       it('should allow potting red when on red phase', () => {
         const state = createTestGameState({ nextRequiredType: 'red' });
-        const redBall: Ball = {
-          id: 'red-1',
-          x: 300,
-          y: 200,
-          vx: 0,
-          vy: 0,
-          type: 'red',
-          isPocketed: true,
-          radius: 8.25,
-        };
+        const redBall = createTestBall({ id: 'red-1', type: 'red', isPocketed: true });
         
         const result = RulesEngine.validateShot(state, [redBall], false, redBall);
         
@@ -194,16 +151,7 @@ describe('RulesEngine', () => {
 
       it('should return foul when potting wrong ball', () => {
         const state = createTestGameState({ nextRequiredType: 'red' });
-        const yellowBall: Ball = {
-          id: 'yellow',
-          x: 300,
-          y: 200,
-          vx: 0,
-          vy: 0,
-          type: 'color',
-          isPocketed: true,
-          radius: 8.25,
-        };
+        const yellowBall = createTestBall({ id: 'yellow', type: 'color', color: '#FFCC00', isPocketed: true });
         
         const result = RulesEngine.validateShot(state, [yellowBall], false, yellowBall);
         
@@ -226,16 +174,7 @@ describe('RulesEngine', () => {
 
     it('should award foul points when hitting wrong color', () => {
       const state = createTestGameState({ nextRequiredType: 'red' });
-      const yellowBall: Ball = {
-        id: 'yellow',
-        x: 300,
-        y: 200,
-        vx: 0,
-        vy: 0,
-        type: 'color',
-        isPocketed: false,
-        radius: 8.25,
-      };
+      const yellowBall = createTestBall({ id: 'yellow', type: 'color', color: '#FFCC00' });
       
       const newState = RulesEngine.processShotResult(state, [], false, yellowBall);
       
@@ -254,6 +193,28 @@ describe('RulesEngine', () => {
       const cueBall = newState.balls.find(b => b.id === 'cue');
       expect(cueBall).toBeDefined();
       expect(cueBall?.isPocketed).toBe(false);
+    });
+
+    it('should restore colors to their correct spots after foul', () => {
+      const state = createTestGameState({ nextRequiredType: 'red' });
+      const yellowBall = createTestBall({ id: 'yellow', type: 'color', color: '#FFCC00', isPocketed: true });
+      
+      // Yellow is potted but it's a foul (should have been red)
+      const newState = RulesEngine.processShotResult(state, [yellowBall], false, yellowBall);
+      
+      expect(newState.foulCommitted).toBe(true);
+      
+      // Check that yellow was restored and is not pocketed
+      const restoredYellow = newState.balls.find(b => b.id === 'yellow');
+      expect(restoredYellow).toBeDefined();
+      expect(restoredYellow?.isPocketed).toBe(false);
+      
+      // Yellow should be at its spot position (baulk line, upper D position)
+      expect(restoredYellow?.x).toBeCloseTo(163.38, 1); // Baulk line x
+      expect(restoredYellow?.y).toBeCloseTo(264.79, 1); // D upper position
+      // Check that velocity is reset
+      expect(restoredYellow?.vx).toBe(0);
+      expect(restoredYellow?.vy).toBe(0);
     });
   });
 });

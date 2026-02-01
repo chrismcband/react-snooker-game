@@ -1,5 +1,6 @@
 import { Ball } from '../types/Ball';
 import { GameState } from './ScoreSystem';
+import { TABLE_MARKINGS } from '../utils/constants';
 
 export class RulesEngine {
   private static colorSequence: ('yellow' | 'green' | 'brown' | 'blue' | 'pink' | 'black')[] = 
@@ -148,17 +149,19 @@ export class RulesEngine {
       newState.currentPlayer = opponent;
       newState.currentBreak = 0;
       
-      // After a foul, next required type resets
-      newState.nextRequiredType = state.redsRemaining > 0 ? 'red' : this.getCurrentColorInSequence(newState);
+       // After a foul, next required type resets
+       newState.nextRequiredType = state.redsRemaining > 0 ? 'red' : this.getCurrentColorInSequence(newState);
 
-      // Return colors to their spots if they were potted
-      pottedBalls.forEach(ball => {
-        if (ball.type === 'color') {
-          newState.balls = newState.balls.map(b => 
-            b.id === ball.id ? { ...b, isPocketed: false } : b
-          );
-        }
-      });
+       // Return colors to their spots if they were potted
+       pottedBalls.forEach(ball => {
+         if (ball.type === 'color') {
+           const colorSpots = TABLE_MARKINGS.colorSpots as Record<string, { x: number; y: number }>;
+           const spot = colorSpots[ball.id];
+           newState.balls = newState.balls.map(b => 
+             b.id === ball.id && spot ? { ...b, isPocketed: false, x: spot.x, y: spot.y, vx: 0, vy: 0 } : b
+           );
+         }
+       });
       // Handle cue ball if pocketed
       if (cueBallPocketed) {
         newState.balls = newState.balls.map(b =>
