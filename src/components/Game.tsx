@@ -255,19 +255,15 @@ export const Game: React.FC = () => {
           nextState = RulesEngine.processShotResult(nextState, pocketedBalls, cueBallPocketed);
         }
 
-        // Stop animation when all balls have stopped
-        if (!anyBallsMoving) {
-          // If no balls were potted and no foul, switch turns
-          if (pocketedBalls.length === 0 && !cueBallPocketed && !nextState.foulCommitted) {
-            nextState = RulesEngine.processShotResult(nextState, [], false);
-          }
+         // Stop animation when all balls have stopped
+         if (!anyBallsMoving) {
+           // DON'T switch turns here - let the turn-switch effect handle it
+           // Track how many balls were potted this shot for turn logic
+           ballsPottedThisShotRef.current = pocketedBalls.length;
 
-          // Track how many balls were potted this shot for turn logic
-          ballsPottedThisShotRef.current = pocketedBalls.length;
-
-          // Mark that we should end the shot on the next frame
-          setShotJustEnded(true);
-        }
+           // Mark that we should end the shot on the next frame
+           setShotJustEnded(true);
+         }
 
        return nextState;
     });
