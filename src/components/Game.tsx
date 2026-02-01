@@ -42,6 +42,7 @@ export const Game: React.FC = () => {
   const aiShotExecutedRef = useRef<boolean>(false);
   const ballsPottedThisShotRef = useRef<number>(0);
   const shotResultProcessedRef = useRef<boolean>(false);
+  const ballsPottedCounterRef = useRef<number>(0);
 
   const balls = gameState.balls;
 
@@ -232,39 +233,42 @@ export const Game: React.FC = () => {
         }
       }
 
-       // Check for pocketed balls
-       const pocketedBalls: BallType[] = [];
-       let cueBallPocketed = false;
-       newBalls.forEach(ball => {
-         if (!ball.isPocketed && PocketSystem.shouldRemoveBall(ball)) {
-           ball.isPocketed = true;
-           if (ball.id === 'cue') {
-             cueBallPocketed = true;
-           } else {
-             pocketedBalls.push(ball);
-           }
+        // Check for pocketed balls
+        const pocketedBalls: BallType[] = [];
+        let cueBallPocketed = false;
+        newBalls.forEach(ball => {
+          if (!ball.isPocketed && PocketSystem.shouldRemoveBall(ball)) {
+            ball.isPocketed = true;
+            if (ball.id === 'cue') {
+              cueBallPocketed = true;
+            } else {
+              pocketedBalls.push(ball);
+              // Accumulate the count of balls potted during this shot
+              ballsPottedCounterRef.current += 1;
+            }
+          }
+        });
+
+         let nextState = { ...prev, balls: newBalls };
+
+         // Handle pocketed balls during the shot
+         if (pocketedBalls.length > 0 || cueBallPocketed) {
+           pocketedBalls.forEach(ball => {
+             nextState = ScoreSystem.handleBallPotted(nextState, ball);
+           });
+           nextState = RulesEngine.processShotResult(nextState, pocketedBalls, cueBallPocketed);
          }
-       });
 
-        let nextState = { ...prev, balls: newBalls };
+          // Stop animation when all balls have stopped
+          if (!anyBallsMoving) {
+            // Track how many balls were potted this shot for turn logic
+            ballsPottedThisShotRef.current = ballsPottedCounterRef.current;
+            ballsPottedCounterRef.current = 0;  // Reset counter for next shot
+            shotResultProcessedRef.current = false;  // Mark that we need to process the result
 
-        // Handle pocketed balls during the shot
-        if (pocketedBalls.length > 0 || cueBallPocketed) {
-          pocketedBalls.forEach(ball => {
-            nextState = ScoreSystem.handleBallPotted(nextState, ball);
-          });
-          nextState = RulesEngine.processShotResult(nextState, pocketedBalls, cueBallPocketed);
-        }
-
-         // Stop animation when all balls have stopped
-         if (!anyBallsMoving) {
-           // Track how many balls were potted this shot for turn logic
-           ballsPottedThisShotRef.current = pocketedBalls.length;
-           shotResultProcessedRef.current = false;  // Mark that we need to process the result
-
-           // Mark that we should end the shot on the next frame
-           setShotJustEnded(true);
-         }
+            // Mark that we should end the shot on the next frame
+            setShotJustEnded(true);
+          }
 
        return nextState;
     });
@@ -301,15 +305,26 @@ export const Game: React.FC = () => {
 
     // Handle turn switching after shot completes
     useEffect(() => {
+     console.log('Turn switch effect check:', { 
+       shotJustEnded, 
+       shotResultProcessedRef: shotResultProcessedRef.current,
+       ballsPotted: ballsPottedThisShotRef.current,
+       foulCommitted: gameState.foulCommitted,
+       currentPlayer: gameState.currentPlayer 
+     });
+
      // Process shot result only once when shot ends
      if (shotJustEnded && !shotResultProcessedRef.current) {
        shotResultProcessedRef.current = true;
+       
+       console.log('Processing shot result:', { ballsPotted: ballsPottedThisShotRef.current, foulCommitted: gameState.foulCommitted });
        
        let newState = gameState;
        
        // Process the shot with RulesEngine to get correct game state
        if (ballsPottedThisShotRef.current === 0 && !gameState.foulCommitted) {
          // No balls potted and no foul - normal miss
+         console.log('Calling RulesEngine.processShotResult for no-balls-potted case');
          newState = RulesEngine.processShotResult(newState, [], false);
        }
        
@@ -319,7 +334,7 @@ export const Game: React.FC = () => {
          console.log(`Shot completed - no balls potted. Switching from Player ${gameState.currentPlayer} to Player ${gameState.currentPlayer === 1 ? 2 : 1}`);
        } else if (ballsPottedThisShotRef.current > 0 || gameState.foulCommitted) {
          // Balls were potted or foul committed - same player keeps turn
-         console.log(`Shot completed - ${ballsPottedThisShotRef.current > 0 ? 'balls potted' : 'foul committed'}. Player ${gameState.currentPlayer} keeps their turn`);
+         console.log(`Shot completed - ${ballsPottedThisShotRef.current > 0 ? ballsPottedThisShotRef.current + ' balls potted' : 'foul committed'}. Player ${gameState.currentPlayer} keeps their turn`);
        }
        
        setGameState(newState);
