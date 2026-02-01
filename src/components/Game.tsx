@@ -4,6 +4,7 @@ import { Table } from './Table';
 import { Ball } from './Ball';
 import { CueController } from './CueController';
 import { GameUI } from './GameUI';
+import { FoulNotification } from './FoulNotification';
 import { createInitialBalls } from '../utils/gameSetup';
 import { CollisionSystem } from '../physics/CollisionSystem';
 import { PocketSystem } from '../game/PocketSystem';
@@ -36,6 +37,7 @@ export const Game: React.FC = () => {
   const [shotJustEnded, setShotJustEnded] = useState(false);
   const [isAIThinking, setIsAIThinking] = useState(false);
   const [aiShot, setAiShot] = useState<{ angle: number; power: number } | null>(null);
+  const [foulNotification, setFoulNotification] = useState<string | null>(null);
    const animationFrameRef = useRef<number | null>(null);
    const stageRef = useRef<any>(null);
    const containerRef = useRef<HTMLDivElement>(null);
@@ -103,18 +105,19 @@ export const Game: React.FC = () => {
        aiShotFired: aiShotFiredRef.current,
      });
 
-     if (
-       gameState.gamePhase === 'playing' &&
-       gameState.currentPlayer === 2 &&
-       !isShotInProgress &&
-       !isAIThinking &&
-       !aiShot &&
-       !aiShotFiredRef.current  // Only trigger if we haven't already fired a shot this turn
-     ) {
-       setIsAIThinking(true);
-       console.log('✓ AI TRIGGER CONDITIONS MET - thinking, will calculate shot in 1s');
-     }
-   }, [gameState.gamePhase, gameState.currentPlayer, isShotInProgress, isAIThinking, aiShot]);
+      if (
+        gameState.gamePhase === 'playing' &&
+        gameState.currentPlayer === 2 &&
+        !isShotInProgress &&
+        !isAIThinking &&
+        !aiShot &&
+        !aiShotFiredRef.current &&  // Only trigger if we haven't already fired a shot this turn
+        !foulNotification  // Don't start AI turn while foul notification is displayed
+      ) {
+        setIsAIThinking(true);
+        console.log('✓ AI TRIGGER CONDITIONS MET - thinking, will calculate shot in 1s');
+      }
+    }, [gameState.gamePhase, gameState.currentPlayer, isShotInProgress, isAIThinking, aiShot, foulNotification]);
 
    // Calculate AI shot after thinking delay
    useEffect(() => {
@@ -378,29 +381,40 @@ export const Game: React.FC = () => {
        
        console.log('Processing shot result:', { ballsPotted: ballsPottedThisShotRef.current, foulCommitted: gameState.foulCommitted });
        
-       let newState = gameState;
-       
-        // Call RulesEngine.processShotResult with the correct balls
-        if (ballsPottedThisShotRef.current > 0 || cueBallPocketedRef.current) {
-          // Balls were potted - pass them to RulesEngine
-          console.log('Calling RulesEngine.processShotResult with potted balls');
-          newState = RulesEngine.processShotResult(newState, pocketedBallsRef.current, cueBallPocketedRef.current, firstBallHitRef.current);
-        } else {
-          // No balls potted - pass empty array
-          console.log('Calling RulesEngine.processShotResult for no-balls-potted case');
-          newState = RulesEngine.processShotResult(newState, [], false, firstBallHitRef.current);
+        let newState = gameState;
+        let foulReason = '';
+        
+         // Validate the shot to check for fouls
+         const pottedBalls = ballsPottedThisShotRef.current > 0 ? pocketedBallsRef.current : [];
+         const validation = RulesEngine.validateShot(newState, pottedBalls, cueBallPocketedRef.current, firstBallHitRef.current);
+         
+         // Call RulesEngine.processShotResult with the correct balls
+         if (ballsPottedThisShotRef.current > 0 || cueBallPocketedRef.current) {
+           // Balls were potted - pass them to RulesEngine
+           console.log('Calling RulesEngine.processShotResult with potted balls');
+           newState = RulesEngine.processShotResult(newState, pocketedBallsRef.current, cueBallPocketedRef.current, firstBallHitRef.current);
+         } else {
+           // No balls potted - pass empty array
+           console.log('Calling RulesEngine.processShotResult for no-balls-potted case');
+           newState = RulesEngine.processShotResult(newState, [], false, firstBallHitRef.current);
+         }
+        
+         // If a foul was committed, show the foul notification
+         if (!validation.valid && validation.reason) {
+           foulReason = validation.reason;
+           setFoulNotification(`Foul! ${foulReason}`);
+         }
+        
+        // Now handle turn switching based on what happened
+        if (ballsPottedThisShotRef.current === 0 && !gameState.foulCommitted) {
+          // No balls potted and no foul - switch turns
+          console.log(`Shot completed - no balls potted. Switching from Player ${gameState.currentPlayer} to Player ${gameState.currentPlayer === 1 ? 2 : 1}`);
+        } else if (ballsPottedThisShotRef.current > 0 || gameState.foulCommitted) {
+          // Balls were potted or foul committed - same player keeps turn
+          console.log(`Shot completed - ${ballsPottedThisShotRef.current > 0 ? ballsPottedThisShotRef.current + ' balls potted' : 'foul committed'}. Player ${gameState.currentPlayer} keeps their turn`);
         }
-       
-       // Now handle turn switching based on what happened
-       if (ballsPottedThisShotRef.current === 0 && !gameState.foulCommitted) {
-         // No balls potted and no foul - switch turns
-         console.log(`Shot completed - no balls potted. Switching from Player ${gameState.currentPlayer} to Player ${gameState.currentPlayer === 1 ? 2 : 1}`);
-       } else if (ballsPottedThisShotRef.current > 0 || gameState.foulCommitted) {
-         // Balls were potted or foul committed - same player keeps turn
-         console.log(`Shot completed - ${ballsPottedThisShotRef.current > 0 ? ballsPottedThisShotRef.current + ' balls potted' : 'foul committed'}. Player ${gameState.currentPlayer} keeps their turn`);
-       }
-       
-       setGameState(newState);
+        
+        setGameState(newState);
        
        // Reset refs for next shot
        aiShotFiredRef.current = false;
@@ -447,54 +461,64 @@ export const Game: React.FC = () => {
 
    const isAiTurn = gameState.currentPlayer === 2 && gameState.gamePhase === 'playing';
 
-    return (
-     <div style={{ position: 'relative', width: '100vw', height: '100vh', backgroundColor: '#1a1a1a', display: 'flex', flexDirection: 'column' }}>
-       <GameUI
-         gameState={gameState}
-         onStartGame={handleStartGame}
-         onResetGame={handleResetGame}
-         isAiTurn={isAiTurn}
-       />
+     return (
+      <>
+        <div style={{ position: 'relative', width: '100vw', height: '100vh', backgroundColor: '#1a1a1a', display: 'flex', flexDirection: 'column' }}>
+          <GameUI
+            gameState={gameState}
+            onStartGame={handleStartGame}
+            onResetGame={handleResetGame}
+            isAiTurn={isAiTurn}
+          />
 
-        <div ref={containerRef} style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-          <div style={{ transform: `scale(${scale})` }}>
-            <Stage
-              ref={stageRef}
-              width={unscaledWidth}
-              height={unscaledHeight}
-             >
-              <Layer x={cueRenderingSpace + TABLE_DIMENSIONS.frameWidth} y={cueRenderingSpace + TABLE_DIMENSIONS.frameWidth}>
-               <Table>
-                 {balls.map(ball => (
-                   <Ball
-                     key={ball.id}
-                     ball={ball}
-                     onPositionUpdate={handleBallPositionUpdate}
-                     draggable={ball.id === 'cue' && gameState.gamePhase === 'positioning'}
-                     onDragEnd={ball.id === 'cue' ? onCueBallDragEnd : undefined}
-                     dragBoundFunc={ball.id === 'cue' && gameState.gamePhase === 'positioning' ? cueBallDragBoundFunc : undefined}
-                   />
-                 ))}
-               </Table>
-             </Layer>
-            <Layer x={cueRenderingSpace + TABLE_DIMENSIONS.frameWidth} y={cueRenderingSpace + TABLE_DIMENSIONS.frameWidth}>
-              {cueBall && !cueBall.isPocketed && gameState.gamePhase === 'playing' && (
-                <CueController
-                  cueBallX={cueBall.x}
-                  cueBallY={cueBall.y}
-                  onShoot={handleShoot}
-                  disabled={isShotInProgress}
-                  isAiTurn={isAiTurn}
-                  aiShot={aiShot}
-                  stageRef={stageRef}
-                  scale={scale}
-                  cueRenderingSpace={cueRenderingSpace}
-                />
-              )}
-            </Layer>
-          </Stage>
-          </div>
-        </div>
-     </div>
-  );
+           <div ref={containerRef} style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+             <div style={{ transform: `scale(${scale})` }}>
+               <Stage
+                 ref={stageRef}
+                 width={unscaledWidth}
+                 height={unscaledHeight}
+                >
+                 <Layer x={cueRenderingSpace + TABLE_DIMENSIONS.frameWidth} y={cueRenderingSpace + TABLE_DIMENSIONS.frameWidth}>
+                  <Table>
+                    {balls.map(ball => (
+                      <Ball
+                        key={ball.id}
+                        ball={ball}
+                        onPositionUpdate={handleBallPositionUpdate}
+                        draggable={ball.id === 'cue' && gameState.gamePhase === 'positioning'}
+                        onDragEnd={ball.id === 'cue' ? onCueBallDragEnd : undefined}
+                        dragBoundFunc={ball.id === 'cue' && gameState.gamePhase === 'positioning' ? cueBallDragBoundFunc : undefined}
+                      />
+                    ))}
+                  </Table>
+                </Layer>
+                 <Layer x={cueRenderingSpace + TABLE_DIMENSIONS.frameWidth} y={cueRenderingSpace + TABLE_DIMENSIONS.frameWidth}>
+                   {cueBall && !cueBall.isPocketed && gameState.gamePhase === 'playing' && (
+                     <CueController
+                       cueBallX={cueBall.x}
+                       cueBallY={cueBall.y}
+                       onShoot={handleShoot}
+                       disabled={isShotInProgress}
+                       isAiTurn={isAiTurn}
+                       aiShot={aiShot}
+                       stageRef={stageRef}
+                       scale={scale}
+                       cueRenderingSpace={cueRenderingSpace}
+                     />
+                   )}
+                 </Layer>
+               </Stage>
+              </div>
+            </div>
+         </div>
+
+        {foulNotification && (
+          <FoulNotification
+            foulMessage={foulNotification}
+            onDismiss={() => setFoulNotification(null)}
+            displayDuration={5000}
+          />
+        )}
+      </>
+    );
 };
