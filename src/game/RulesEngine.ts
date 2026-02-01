@@ -138,16 +138,34 @@ export class RulesEngine {
     const validation = this.validateShot(state, pottedBalls, cueBallPocketed, firstBallHit);
     let newState = { ...state };
 
+    console.log('[RulesEngine] processShotResult called:', {
+      validationResult: { valid: validation.valid, reason: validation.reason, foulPoints: validation.foulPoints },
+      currentPlayer: state.currentPlayer,
+      pottedBallsCount: pottedBalls.length,
+      pottedBallIds: pottedBalls.map(b => b.id),
+      firstBallHit: firstBallHit?.id,
+      cueBallPocketed,
+      nextRequiredTypeBefore: state.nextRequiredType,
+    });
+
     if (!validation.valid) {
       newState.foulCommitted = true;
       const opponent = state.currentPlayer === 1 ? 2 : 1;
+      const foulPoints = validation.foulPoints || 4;
       newState.scores = {
         ...state.scores,
         [opponent === 1 ? 'player1' : 'player2']:
-          state.scores[opponent === 1 ? 'player1' : 'player2'] + (validation.foulPoints || 4),
+          state.scores[opponent === 1 ? 'player1' : 'player2'] + foulPoints,
       };
       newState.currentPlayer = opponent;
       newState.currentBreak = 0;
+      
+      console.log('[RulesEngine] FOUL committed:', {
+        reason: validation.reason,
+        foulPoints,
+        awardedToPlayer: opponent,
+        newScores: newState.scores,
+      });
       
        // After a foul, next required type resets
        newState.nextRequiredType = state.redsRemaining > 0 ? 'red' : this.getCurrentColorInSequence(newState);
@@ -185,6 +203,14 @@ export class RulesEngine {
          };
          newState.currentBreak = state.currentBreak + pottedPoints;
          
+         console.log('[RulesEngine] VALID SHOT - balls potted:', {
+           pottedBallIds: pottedBalls.map(b => b.id),
+           pointsAwarded: pottedPoints,
+           awardedToPlayer: state.currentPlayer,
+           newScores: newState.scores,
+           newBreak: newState.currentBreak,
+         });
+         
         // Update next required type and decrement reds counter
           if (pottedBalls.some(b => b.type === 'red')) {
             // Count how many reds were potted this shot
@@ -206,20 +232,37 @@ export class RulesEngine {
              newState.nextRequiredType = this.getNextColorInSequence(newState, pottedBalls[0]);
            }
          }
-      } else {
-        // No balls potted
-        newState.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
-        newState.currentBreak = 0;
-        newState.nextRequiredType = state.redsRemaining > 0 ? 'red' : this.getCurrentColorInSequence(newState);
-        newState.gamePhase = 'playing';
-      }
+       } else {
+         // No balls potted - switch turns
+         const newPlayer = state.currentPlayer === 1 ? 2 : 1;
+         newState.currentPlayer = newPlayer;
+         newState.currentBreak = 0;
+         newState.nextRequiredType = state.redsRemaining > 0 ? 'red' : this.getCurrentColorInSequence(newState);
+         newState.gamePhase = 'playing';
+         
+         console.log('[RulesEngine] NO BALLS POTTED - turn switches:', {
+           previousPlayer: state.currentPlayer,
+           newPlayer: newPlayer,
+           nextRequiredType: newState.nextRequiredType,
+           redsRemaining: state.redsRemaining,
+         });
+       }
     }
 
-    if (newState.nextRequiredType === 'ended') {
-      newState.gamePhase = 'ended';
-    }
+     if (newState.nextRequiredType === 'ended') {
+       newState.gamePhase = 'ended';
+     }
 
-    return newState;
+     console.log('[RulesEngine] processShotResult returning state:', {
+       currentPlayer: newState.currentPlayer,
+       nextRequiredType: newState.nextRequiredType,
+       foulCommitted: newState.foulCommitted,
+       scores: newState.scores,
+       currentBreak: newState.currentBreak,
+       redsRemaining: newState.redsRemaining,
+     });
+
+     return newState;
   }
 
   public static getAvailableBalls(state: GameState): Ball[] {

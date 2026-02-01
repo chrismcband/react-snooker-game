@@ -407,9 +407,18 @@ export const Game: React.FC = () => {
              nextRequiredType: gameState.nextRequiredType,
              firstBallHit: firstBallHitRef.current?.id,
              currentPlayer: gameState.currentPlayer,
+             validationScore: validation.valid,
            });
            setFoulNotification(`Foul! ${foulReason}`);
          }
+        
+        // Log turn logic BEFORE any changes
+        console.log('TURN LOGIC - Before newState update:', {
+          ballsPottedThisShotRef: ballsPottedThisShotRef.current,
+          gameStateFoulCommitted: gameState.foulCommitted,
+          newStateFoulCommitted: newState.foulCommitted,
+          newStateCurrentPlayer: newState.currentPlayer,
+        });
         
         // Now handle turn switching based on what happened
         if (ballsPottedThisShotRef.current === 0 && !gameState.foulCommitted) {
@@ -421,11 +430,14 @@ export const Game: React.FC = () => {
         }
         
         console.log('State after shot:', {
-          currentPlayer: newState.currentPlayer,
+          currentPlayerOld: gameState.currentPlayer,
+          currentPlayerNew: newState.currentPlayer,
           nextRequiredType: newState.nextRequiredType,
           redsRemaining: newState.redsRemaining,
           foulCommitted: newState.foulCommitted,
           ballsPotted: ballsPottedThisShotRef.current,
+          scores: newState.scores,
+          currentBreak: newState.currentBreak,
         });
         
         setGameState(newState);
