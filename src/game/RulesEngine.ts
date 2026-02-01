@@ -171,18 +171,27 @@ export class RulesEngine {
       } else {
         newState.gamePhase = 'playing';
       }
-    } else {
-      if (pottedBalls.length > 0) {
-        newState.foulCommitted = false;
-        newState.gamePhase = 'playing';
-        
-       // Update next required type and decrement reds counter
-         if (pottedBalls.some(b => b.type === 'red')) {
-           // Count how many reds were potted this shot
-           const redsPotted = pottedBalls.filter(b => b.type === 'red').length;
-           newState.redsRemaining = Math.max(0, state.redsRemaining - redsPotted);
-           newState.nextRequiredType = 'any-color';
-         } else {
+     } else {
+       if (pottedBalls.length > 0) {
+         newState.foulCommitted = false;
+         newState.gamePhase = 'playing';
+         
+         // Calculate points for potted balls and add to current player's score
+         const pottedPoints = pottedBalls.reduce((total, ball) => total + ball.pointValue, 0);
+         const currentPlayer = state.currentPlayer === 1 ? 'player1' : 'player2';
+         newState.scores = {
+           ...state.scores,
+           [currentPlayer]: state.scores[currentPlayer] + pottedPoints,
+         };
+         newState.currentBreak = state.currentBreak + pottedPoints;
+         
+        // Update next required type and decrement reds counter
+          if (pottedBalls.some(b => b.type === 'red')) {
+            // Count how many reds were potted this shot
+            const redsPotted = pottedBalls.filter(b => b.type === 'red').length;
+            newState.redsRemaining = Math.max(0, state.redsRemaining - redsPotted);
+            newState.nextRequiredType = 'any-color';
+          } else {
           // A color was potted
           if (state.redsRemaining > 0) {
             newState.nextRequiredType = 'red';

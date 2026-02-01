@@ -247,5 +247,47 @@ describe('RulesEngine', () => {
       expect(newState.redsRemaining).toBe(5);
       expect(newState.nextRequiredType).toBe('red');
     });
+
+    it('should award points for potted balls to current player', () => {
+      const state = createTestGameState({ nextRequiredType: 'red', currentPlayer: 1 });
+      const redBall = createTestBall({ id: 'red-1', type: 'red', pointValue: 1, isPocketed: true });
+      
+      const newState = RulesEngine.processShotResult(state, [redBall], false, redBall);
+      
+      expect(newState.scores.player1).toBe(1);
+      expect(newState.currentBreak).toBe(1);
+    });
+
+    it('should award points for multiple potted balls', () => {
+      const state = createTestGameState({ nextRequiredType: 'red', currentPlayer: 1 });
+      const red1 = createTestBall({ id: 'red-1', type: 'red', pointValue: 1, isPocketed: true });
+      const red2 = createTestBall({ id: 'red-2', type: 'red', pointValue: 1, isPocketed: true });
+      
+      const newState = RulesEngine.processShotResult(state, [red1, red2], false, red1);
+      
+      expect(newState.scores.player1).toBe(2);
+      expect(newState.currentBreak).toBe(2);
+    });
+
+    it('should award color points when color is potted', () => {
+      const state = createTestGameState({ nextRequiredType: 'any-color', currentPlayer: 1 });
+      const yellowBall = createTestBall({ id: 'yellow', type: 'color', color: '#FFCC00', pointValue: 2, isPocketed: true });
+      
+      const newState = RulesEngine.processShotResult(state, [yellowBall], false, yellowBall);
+      
+      expect(newState.scores.player1).toBe(2);
+      expect(newState.currentBreak).toBe(2);
+    });
+
+    it('should award points for color potted after red', () => {
+      const state = createTestGameState({ nextRequiredType: 'any-color', currentPlayer: 1, redsRemaining: 5 });
+      const blackBall = createTestBall({ id: 'black', type: 'color', color: '#000000', pointValue: 7, isPocketed: true });
+      
+      const newState = RulesEngine.processShotResult(state, [blackBall], false, blackBall);
+      
+      expect(newState.scores.player1).toBe(7);
+      expect(newState.currentBreak).toBe(7);
+      expect(newState.nextRequiredType).toBe('red');
+    });
   });
 });
