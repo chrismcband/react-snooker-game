@@ -248,41 +248,59 @@ export const Game: React.FC = () => {
      return { x: x + layerX, y: y + layerY };
    }, []);
 
-   // Physics update loop
-   const updatePhysics = useCallback(() => {
-     if (!isShotInProgress) return;
-
-     setGameState(prev => {
-       // Calculate delta time for frame-rate independent physics
-       const currentTime = performance.now();
-       let deltaTime = 0.016; // Default to ~60fps (16ms)
-       
-       // Debug: Log first frame of physics
-       if (lastFrameTimeRef.current === 0) {
-         console.log('[Physics] Starting physics loop, cue ball vx:', prev.balls.find(b => b.id === 'cue')?.vx);
-       }
-       
-       if (lastFrameTimeRef.current > 0) {
-         deltaTime = Math.min((currentTime - lastFrameTimeRef.current) / 1000, 0.05); // Cap at 50ms to prevent huge jumps
-       }
-       lastFrameTimeRef.current = currentTime;
-
-       const newBalls = prev.balls.map(b => ({ ...b }));
-       let anyBallsMoving = false;
-
-       // Update each ball
-       for (let i = 0; i < newBalls.length; i++) {
-         const ball = newBalls[i];
-         if (ball.isPocketed) continue;
-
-         CollisionSystem.applyFriction(ball, PHYSICS_CONSTANTS.friction, deltaTime);
-         CollisionSystem.updateBallPosition(ball, deltaTime);
-         CollisionSystem.resolveCushionCollision(ball, PHYSICS_CONSTANTS.restitution);
-
-        if (CollisionSystem.isBallMoving(ball)) {
-          anyBallsMoving = true;
-        }
+    // Physics update loop
+    const updatePhysics = useCallback(() => {
+      console.log('[Physics] updatePhysics frame running, isShotInProgress:', isShotInProgress);
+      
+      if (!isShotInProgress) {
+        console.log('[Physics] Shot no longer in progress, stopping physics loop');
+        return;
       }
+
+      setGameState(prev => {
+        // Calculate delta time for frame-rate independent physics
+        const currentTime = performance.now();
+        let deltaTime = 0.016; // Default to ~60fps (16ms)
+        
+        // Debug: Log first frame of physics
+        if (lastFrameTimeRef.current === 0) {
+          console.log('[Physics] Starting physics loop, cue ball vx:', prev.balls.find(b => b.id === 'cue')?.vx);
+        }
+        
+        if (lastFrameTimeRef.current > 0) {
+          deltaTime = Math.min((currentTime - lastFrameTimeRef.current) / 1000, 0.05); // Cap at 50ms to prevent huge jumps
+        }
+        lastFrameTimeRef.current = currentTime;
+
+        const newBalls = prev.balls.map(b => ({ ...b }));
+        let anyBallsMoving = false;
+
+        // Update each ball
+        for (let i = 0; i < newBalls.length; i++) {
+          const ball = newBalls[i];
+          if (ball.isPocketed) continue;
+
+          const velBefore = { vx: ball.vx, vy: ball.vy };
+          const posBefore = { x: ball.x, y: ball.y };
+          
+          CollisionSystem.applyFriction(ball, PHYSICS_CONSTANTS.friction, deltaTime);
+          CollisionSystem.updateBallPosition(ball, deltaTime);
+          CollisionSystem.resolveCushionCollision(ball, PHYSICS_CONSTANTS.restitution);
+
+          if (ball.id === 'cue' && (velBefore.vx !== 0 || velBefore.vy !== 0)) {
+            console.log('[Physics] Cue ball update:', {
+              deltaTime,
+              velBefore,
+              velAfter: { vx: ball.vx, vy: ball.vy },
+              posBefore,
+              posAfter: { x: ball.x, y: ball.y },
+            });
+          }
+
+         if (CollisionSystem.isBallMoving(ball)) {
+           anyBallsMoving = true;
+         }
+       }
 
       // Check ball-to-ball collisions
       // Track the first ball the cue ball hits
@@ -351,25 +369,32 @@ export const Game: React.FC = () => {
              setShotJustEnded(true);
            }
 
-       return nextState;
-    });
-  }, [isShotInProgress]);
+        return nextState;
+     });
+     
+     // Request next frame while shot is still in progress
+     if (isShotInProgress) {
+       animationFrameRef.current = requestAnimationFrame(updatePhysics);
+     }
+   }, [isShotInProgress]);
 
-  useEffect(() => {
-    if (isShotInProgress) {
-      animationFrameRef.current = requestAnimationFrame(updatePhysics);
-    } else {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    }
+   useEffect(() => {
+     // This effect just sets up the initial request when shot starts
+     if (isShotInProgress && !animationFrameRef.current) {
+       console.log('[Physics] Initial requestAnimationFrame for shot');
+       animationFrameRef.current = requestAnimationFrame(updatePhysics);
+     } else if (!isShotInProgress && animationFrameRef.current) {
+       cancelAnimationFrame(animationFrameRef.current);
+       animationFrameRef.current = null;
+     }
 
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-   }, [isShotInProgress, updatePhysics]);
+     return () => {
+       if (animationFrameRef.current) {
+         cancelAnimationFrame(animationFrameRef.current);
+         animationFrameRef.current = null;
+       }
+     };
+    }, [isShotInProgress, updatePhysics]);
 
    // Handle shot ending and state finalization
    useEffect(() => {
