@@ -41,13 +41,22 @@ export const CueController: React.FC<CueControllerProps> = ({
       setAngle(newAngle);
     } else {
       // Charge power based on distance
+      // We want to measure distance along the line of aim
+      // or just pure distance from ball to mouse.
       const distance = Math.sqrt(dx * dx + dy * dy);
       const maxPower = 30;
-      const minPower = 0;
-      // We want power to increase as we pull away FROM the angle of aim
-      // but the requirement says "moving the mouse away from the ball increases power"
-      // Let's just use distance for now, maybe with a scaling factor
-      const calculatedPower = Math.min(Math.max(distance / 10, minPower), maxPower);
+      
+      // Calculate dot product to see if we are pulling away from or pushing towards the aim
+      // Vector ball-to-mouse: (dx, dy)
+      // Vector ball-to-aim: (cos(angle), sin(angle))
+      // But actually, pulling AWAY from aim should increase power.
+      // So if mouse is at angle + PI, power should be positive.
+      
+      const aimX = Math.cos(angle);
+      const aimY = Math.sin(angle);
+      const pullDist = -(dx * aimX + dy * aimY); // Negative dot product means pulling away
+      
+      const calculatedPower = Math.min(Math.max(pullDist / 10, 0), maxPower);
       setPower(calculatedPower);
     }
   };
