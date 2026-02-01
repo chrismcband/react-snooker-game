@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Line, Circle, Group, Rect } from 'react-konva';
 import { BALL_PROPERTIES, TABLE_DIMENSIONS } from '../utils/constants';
 
@@ -101,7 +101,7 @@ export const CueController: React.FC<CueControllerProps> = ({
       window.removeEventListener('mousemove', handleWindowMouseMove);
       window.removeEventListener('mouseup', handleWindowMouseUp);
     };
-  }, [cueBallX, cueBallY, onShoot, stageRef]);
+  }, [cueBallX, cueBallY, onShoot, stageRef, handleMouseUpLocal]);
 
   // AI Animation Logic
   useEffect(() => {
