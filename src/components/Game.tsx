@@ -169,9 +169,10 @@ export const Game: React.FC = () => {
       return { ...prev, balls: newBalls };
     });
 
-    setIsShotInProgress(true);
-    shotJustEndedRef.current = false;  // Reset for new shot
-    firstBallHitRef.current = null;  // Reset first ball hit tracker
+     setIsShotInProgress(true);
+     shotJustEndedRef.current = false;  // Reset for new shot
+     firstBallHitRef.current = null;  // Reset first ball hit tracker
+     lastFrameTimeRef.current = 0;  // Reset frame timing for new shot
     
     // Clear AI shot only after the physics simulation starts
     // This prevents the animation from being re-triggered
@@ -252,6 +253,11 @@ export const Game: React.FC = () => {
        // Calculate delta time for frame-rate independent physics
        const currentTime = performance.now();
        let deltaTime = 0.016; // Default to ~60fps (16ms)
+       
+       // Debug: Log first frame of physics
+       if (lastFrameTimeRef.current === 0) {
+         console.log('[Physics] Starting physics loop, cue ball vx:', prev.balls.find(b => b.id === 'cue')?.vx);
+       }
        
        if (lastFrameTimeRef.current > 0) {
          deltaTime = Math.min((currentTime - lastFrameTimeRef.current) / 1000, 0.05); // Cap at 50ms to prevent huge jumps
