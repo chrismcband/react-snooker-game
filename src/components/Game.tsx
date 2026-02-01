@@ -41,6 +41,7 @@ export const Game: React.FC = () => {
   const aiShotFiredRef = useRef<boolean>(false);
   const aiShotExecutedRef = useRef<boolean>(false);
   const ballsPottedThisShotRef = useRef<number>(0);
+  const shotResultProcessedRef = useRef<boolean>(false);
 
   const balls = gameState.balls;
 
@@ -257,9 +258,9 @@ export const Game: React.FC = () => {
 
          // Stop animation when all balls have stopped
          if (!anyBallsMoving) {
-           // DON'T switch turns here - let the turn-switch effect handle it
            // Track how many balls were potted this shot for turn logic
            ballsPottedThisShotRef.current = pocketedBalls.length;
+           shotResultProcessedRef.current = false;  // Mark that we need to process the result
 
            // Mark that we should end the shot on the next frame
            setShotJustEnded(true);
@@ -300,50 +301,36 @@ export const Game: React.FC = () => {
 
     // Handle turn switching after shot completes
     useEffect(() => {
-     // Switch turn back to opponent when:
-     // 1. Shot has been executed
-     // 2. Shot is no longer in progress (all balls stopped)
-     // 3. NO balls were potted this shot (player loses turn if miss)
-     // 4. No foul was committed
-     if (
-       aiShotExecutedRef.current &&
-       !isShotInProgress &&
-       gameState.gamePhase === 'playing' &&
-       ballsPottedThisShotRef.current === 0 &&
-       !gameState.foulCommitted
-     ) {
-       // Shot completed with no balls potted and no foul
-       // Switch turn to opponent
-       const isPlayerTurn = gameState.currentPlayer === 1;
-       console.log(`Shot completed - no balls potted. Switching from Player ${gameState.currentPlayer} to Player ${isPlayerTurn ? 2 : 1}`);
+     // Process shot result only once when shot ends
+     if (shotJustEnded && !shotResultProcessedRef.current) {
+       shotResultProcessedRef.current = true;
+       
+       let newState = gameState;
+       
+       // Process the shot with RulesEngine to get correct game state
+       if (ballsPottedThisShotRef.current === 0 && !gameState.foulCommitted) {
+         // No balls potted and no foul - normal miss
+         newState = RulesEngine.processShotResult(newState, [], false);
+       }
+       
+       // Now handle turn switching based on what happened
+       if (ballsPottedThisShotRef.current === 0 && !gameState.foulCommitted) {
+         // No balls potted and no foul - switch turns
+         console.log(`Shot completed - no balls potted. Switching from Player ${gameState.currentPlayer} to Player ${gameState.currentPlayer === 1 ? 2 : 1}`);
+       } else if (ballsPottedThisShotRef.current > 0 || gameState.foulCommitted) {
+         // Balls were potted or foul committed - same player keeps turn
+         console.log(`Shot completed - ${ballsPottedThisShotRef.current > 0 ? 'balls potted' : 'foul committed'}. Player ${gameState.currentPlayer} keeps their turn`);
+       }
+       
+       setGameState(newState);
        
        // Reset refs for next shot
        aiShotFiredRef.current = false;
        aiShotExecutedRef.current = false;
        ballsPottedThisShotRef.current = 0;
-       
-       setGameState(prev => ({
-         ...prev,
-         currentPlayer: isPlayerTurn ? 2 : 1,
-         gamePhase: 'playing',
-       }));
-     } else if (
-       aiShotExecutedRef.current &&
-       !isShotInProgress &&
-       gameState.gamePhase === 'playing' &&
-       (ballsPottedThisShotRef.current > 0 || gameState.foulCommitted)
-     ) {
-       // Balls were potted or foul committed - same player gets another turn
-       console.log(`Shot completed - ${ballsPottedThisShotRef.current > 0 ? 'balls potted' : 'foul committed'}. Player ${gameState.currentPlayer} keeps their turn`);
-       
-       // Reset both refs so the player can shoot again
-       // This allows AI to calculate and take another shot if it's still their turn
-       aiShotFiredRef.current = false;
-       aiShotExecutedRef.current = false;
-       ballsPottedThisShotRef.current = 0;
-       console.log('Refs reset - player can shoot again');
+       setShotJustEnded(false);
      }
-    }, [isShotInProgress, gameState.currentPlayer, gameState.gamePhase, gameState.foulCommitted]);
+    }, [shotJustEnded, gameState, gameState.foulCommitted]);
 
   const handleStartGame = () => {
     setGameState(prev => ({ ...prev, gamePhase: 'positioning' }));
