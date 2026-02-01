@@ -48,6 +48,101 @@ export const Game: React.FC = () => {
     setBalls(prevBalls => updateBallPosition(prevBalls, id, x, y));
   }, [isShotInProgress]);
 
+  // Physics update loop
+  const updatePhysics = useCallback(() => {
+    if (!isShotInProgress) return;
+
+    setBalls(prevBalls => {
+      const newBalls = [...prevBalls];
+      let anyBallsMoving = false;
+
+      // Update each ball
+      for (let i = 0; i < newBalls.length; i++) {
+        const ball = newBalls[i];
+        if (ball.isPocketed) continue;
+
+        // Apply friction
+        CollisionSystem.applyFriction(ball, PHYSICS_CONSTANTS.friction);
+
+        // Update position
+        CollisionSystem.updateBallPosition(ball);
+
+        // Check cushion collisions
+        CollisionSystem.resolveCushionCollision(ball, PHYSICS_CONSTANTS.restitution);
+
+        // Check if ball is still moving
+        if (CollisionSystem.isBallMoving(ball)) {
+          anyBallsMoving = true;
+        }
+      }
+
+      // Check ball-to-ball collisions
+      for (let i = 0; i < newBalls.length; i++) {
+        for (let j = i + 1; j < newBalls.length; j++) {
+          const ball1 = newBalls[i];
+          const ball2 = newBalls[j];
+
+          if (!ball1.isPocketed && !ball2.isPocketed) {
+            if (CollisionSystem.checkBallCollision(ball1, ball2)) {
+              CollisionSystem.resolveBallCollision(ball1, ball2);
+            }
+          }
+        }
+      }
+
+      // Check for pocketed balls
+      const pocketedBalls: BallType[] = [];
+      const updatedBalls = newBalls.map(ball => {
+        if (!ball.isPocketed && PocketSystem.shouldRemoveBall(ball)) {
+          pocketedBalls.push(ball);
+          return { ...ball, isPocketed: true };
+        }
+        return ball;
+      });
+
+      // Update game state with potted balls
+      if (pocketedBalls.length > 0) {
+        gameStateManager.handleShot(pocketedBalls, false);
+      }
+
+      // Stop animation when all balls have stopped
+      if (!anyBallsMoving) {
+        setIsShotInProgress(false);
+
+        // If no balls were potted and no foul, switch turns
+        if (pocketedBalls.length === 0 && !gameStateManager.getState().foulCommitted) {
+          gameStateManager.handleShot([], false);
+        }
+
+        // Update balls from game state
+        setBalls(gameStateManager.getState().balls);
+      }
+
+      return updatedBalls;
+    });
+
+    if (isShotInProgress) {
+      animationFrameRef.current = requestAnimationFrame(updatePhysics);
+    }
+  }, [isShotInProgress, gameStateManager]);
+
+  useEffect(() => {
+    if (isShotInProgress) {
+      animationFrameRef.current = requestAnimationFrame(updatePhysics);
+    } else {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    }
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isShotInProgress]);
+
   // AI Turn Handling
   useEffect(() => {
     if (gameStateManager.isGameActive() && !isShotInProgress && gameStateManager.getCurrentPlayer() === 2 && !isAIThinking) {

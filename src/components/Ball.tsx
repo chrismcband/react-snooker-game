@@ -26,7 +26,7 @@ export const Ball: React.FC<BallProps> = ({ ball, onPositionUpdate }) => {
       fill={ball.color}
       stroke={ball.type === 'cue' ? '#000000' : '#FFFFFF'}
       strokeWidth={1}
-      draggable={ball.type === 'cue'} // Only allow cue ball to be dragged for testing
+      draggable={false} // Disable dragging, use CueController for movement
       onDragEnd={handleDragEnd}
       visible={!ball.isPocketed}
     />
