@@ -176,10 +176,13 @@ export class RulesEngine {
         newState.foulCommitted = false;
         newState.gamePhase = 'playing';
         
-        // Update next required type
-        if (pottedBalls.some(b => b.type === 'red')) {
-          newState.nextRequiredType = 'any-color';
-        } else {
+       // Update next required type and decrement reds counter
+         if (pottedBalls.some(b => b.type === 'red')) {
+           // Count how many reds were potted this shot
+           const redsPotted = pottedBalls.filter(b => b.type === 'red').length;
+           newState.redsRemaining = Math.max(0, state.redsRemaining - redsPotted);
+           newState.nextRequiredType = 'any-color';
+         } else {
           // A color was potted
           if (state.redsRemaining > 0) {
             newState.nextRequiredType = 'red';

@@ -216,5 +216,36 @@ describe('RulesEngine', () => {
       expect(restoredYellow?.vx).toBe(0);
       expect(restoredYellow?.vy).toBe(0);
     });
+
+    it('should decrement redsRemaining when reds are potted', () => {
+      const state = createTestGameState({ nextRequiredType: 'red', redsRemaining: 15 });
+      const redBall = createTestBall({ id: 'red-1', type: 'red', isPocketed: true });
+      
+      const newState = RulesEngine.processShotResult(state, [redBall], false, redBall);
+      
+      expect(newState.redsRemaining).toBe(14);
+      expect(newState.nextRequiredType).toBe('any-color');
+    });
+
+    it('should decrement redsRemaining for multiple reds potted', () => {
+      const state = createTestGameState({ nextRequiredType: 'red', redsRemaining: 15 });
+      const red1 = createTestBall({ id: 'red-1', type: 'red', isPocketed: true });
+      const red2 = createTestBall({ id: 'red-2', type: 'red', isPocketed: true });
+      
+      const newState = RulesEngine.processShotResult(state, [red1, red2], false, red1);
+      
+      expect(newState.redsRemaining).toBe(13);
+      expect(newState.nextRequiredType).toBe('any-color');
+    });
+
+    it('should preserve redsRemaining when non-red balls are potted', () => {
+      const state = createTestGameState({ nextRequiredType: 'any-color', redsRemaining: 5 });
+      const yellowBall = createTestBall({ id: 'yellow', type: 'color', color: '#FFCC00', isPocketed: true });
+      
+      const newState = RulesEngine.processShotResult(state, [yellowBall], false, yellowBall);
+      
+      expect(newState.redsRemaining).toBe(5);
+      expect(newState.nextRequiredType).toBe('red');
+    });
   });
 });
