@@ -289,5 +289,40 @@ describe('RulesEngine', () => {
       expect(newState.currentBreak).toBe(7);
       expect(newState.nextRequiredType).toBe('red');
     });
+
+    it('should reset nextRequiredType to red when turn switches after miss', () => {
+      const state = createTestGameState({ nextRequiredType: 'any-color', currentPlayer: 1, redsRemaining: 10 });
+      const redBall = createTestBall({ id: 'red-1', type: 'red' });
+      
+      // Player 1 misses (no balls potted, no foul)
+      const newState = RulesEngine.processShotResult(state, [], false, redBall);
+      
+      expect(newState.currentPlayer).toBe(2);
+      expect(newState.nextRequiredType).toBe('red');
+    });
+
+    it('should reset nextRequiredType to red when turn switches after foul', () => {
+      const state = createTestGameState({ nextRequiredType: 'any-color', currentPlayer: 1, redsRemaining: 10 });
+      const redBall = createTestBall({ id: 'red-1', type: 'red' });
+      
+      // Player 1 commits foul by hitting red when must hit color
+      const newState = RulesEngine.processShotResult(state, [], false, redBall);
+      
+      expect(newState.currentPlayer).toBe(2);
+      expect(newState.nextRequiredType).toBe('red');
+      expect(newState.foulCommitted).toBe(true);
+    });
+
+    it('should maintain nextRequiredType when player continues their turn', () => {
+      const state = createTestGameState({ nextRequiredType: 'any-color', currentPlayer: 1, redsRemaining: 10 });
+      const blackBall = createTestBall({ id: 'black', type: 'color', color: '#000000', pointValue: 7, isPocketed: true });
+      
+      // Player 1 pots a color (valid shot)
+      const newState = RulesEngine.processShotResult(state, [blackBall], false, blackBall);
+      
+      expect(newState.currentPlayer).toBe(1); // Player continues
+      expect(newState.nextRequiredType).toBe('red'); // Back to red
+      expect(newState.foulCommitted).toBe(false);
+    });
   });
 });

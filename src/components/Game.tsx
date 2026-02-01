@@ -402,6 +402,12 @@ export const Game: React.FC = () => {
          // If a foul was committed, show the foul notification
          if (!validation.valid && validation.reason) {
            foulReason = validation.reason;
+           console.log('FOUL DETECTED:', {
+             reason: foulReason,
+             nextRequiredType: gameState.nextRequiredType,
+             firstBallHit: firstBallHitRef.current?.id,
+             currentPlayer: gameState.currentPlayer,
+           });
            setFoulNotification(`Foul! ${foulReason}`);
          }
         
@@ -414,9 +420,17 @@ export const Game: React.FC = () => {
           console.log(`Shot completed - ${ballsPottedThisShotRef.current > 0 ? ballsPottedThisShotRef.current + ' balls potted' : 'foul committed'}. Player ${gameState.currentPlayer} keeps their turn`);
         }
         
+        console.log('State after shot:', {
+          currentPlayer: newState.currentPlayer,
+          nextRequiredType: newState.nextRequiredType,
+          redsRemaining: newState.redsRemaining,
+          foulCommitted: newState.foulCommitted,
+          ballsPotted: ballsPottedThisShotRef.current,
+        });
+        
         setGameState(newState);
-       
-       // Reset refs for next shot
+        
+        // Reset refs for next shot
        aiShotFiredRef.current = false;
        aiShotExecutedRef.current = false;
        ballsPottedThisShotRef.current = 0;

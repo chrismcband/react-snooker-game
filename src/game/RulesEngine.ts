@@ -191,20 +191,21 @@ export class RulesEngine {
             const redsPotted = pottedBalls.filter(b => b.type === 'red').length;
             newState.redsRemaining = Math.max(0, state.redsRemaining - redsPotted);
             newState.nextRequiredType = 'any-color';
-          } else {
-          // A color was potted
-          if (state.redsRemaining > 0) {
-            newState.nextRequiredType = 'red';
-            // Return color to spot
-            pottedBalls.forEach(ball => {
-              newState.balls = newState.balls.map(b => 
-                b.id === ball.id ? { ...b, isPocketed: false } : b
-              );
-            });
-          } else {
-            newState.nextRequiredType = this.getNextColorInSequence(newState, pottedBalls[0]);
-          }
-        }
+         } else {
+           // A color was potted
+           if (state.redsRemaining > 0) {
+             newState.nextRequiredType = 'red';
+             // Return color to spot (snooker rule: colors return after being potted in red phase)
+             pottedBalls.forEach(ball => {
+               newState.balls = newState.balls.map(b => 
+                 b.id === ball.id ? { ...b, isPocketed: false } : b
+               );
+             });
+           } else {
+             // No reds remaining - must pot colors in sequence
+             newState.nextRequiredType = this.getNextColorInSequence(newState, pottedBalls[0]);
+           }
+         }
       } else {
         // No balls potted
         newState.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
