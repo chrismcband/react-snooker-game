@@ -21,7 +21,7 @@ declare module 'react-konva' {
     x: number;
     y: number;
     radius: number;
-    fill: string;
+    fill?: string;
     stroke?: string;
     strokeWidth?: number;
     draggable?: boolean;
@@ -43,6 +43,10 @@ declare module 'react-konva' {
     stroke?: string;
     strokeWidth?: number;
     cornerRadius?: number;
+    onMouseDown?: (e: any) => void;
+    onMouseMove?: (e: any) => void;
+    onMouseUp?: (e: any) => void;
+    onMouseLeave?: (e: any) => void;
   }
   
   export interface ArcProps {

@@ -43,7 +43,6 @@ export const CueController: React.FC<CueControllerProps> = ({
       // Charge power based on distance
       // We want to measure distance along the line of aim
       // or just pure distance from ball to mouse.
-      const distance = Math.sqrt(dx * dx + dy * dy);
       const maxPower = 30;
       
       // Calculate dot product to see if we are pulling away from or pushing towards the aim
@@ -157,6 +156,7 @@ export const CueController: React.FC<CueControllerProps> = ({
           x={cueBallX}
           y={cueBallY}
           radius={BALL_PROPERTIES.radius + power}
+          fill="transparent"
           stroke="#FF0000"
           strokeWidth={2}
           opacity={0.5}

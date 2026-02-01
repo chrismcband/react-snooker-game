@@ -1,7 +1,7 @@
 import { Ball } from '../types/Ball';
 import { GameState } from '../game/ScoreSystem';
 import { RulesEngine } from '../game/RulesEngine';
-import { POCKET_POSITIONS, TABLE_DIMENSIONS } from '../utils/constants';
+import { POCKET_POSITIONS } from '../utils/constants';
 
 export class AIEngine {
   public static calculateShot(state: GameState): { angle: number; power: number } | null {
