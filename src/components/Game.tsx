@@ -307,13 +307,13 @@ export const Game: React.FC = () => {
 
          let nextState = { ...prev, balls: newBalls };
 
-         // Handle scoring for pocketed balls, but DON'T process shot result yet
-         // (we'll do that in the turn-switch effect to avoid double-processing)
+         // Store pocketed balls for later processing by RulesEngine
+         // (do NOT score them here - RulesEngine.processShotResult will handle all scoring)
          if (pocketedBalls.length > 0 || cueBallPocketed) {
-           pocketedBalls.forEach(ball => {
-             nextState = ScoreSystem.handleBallPotted(nextState, ball);
+           console.log('[Physics] Balls pocketed (will be scored by RulesEngine):', {
+             ballIds: pocketedBalls.map(b => b.id),
+             cueBallPocketed,
            });
-           // Store for later processing in turn-switch effect
            pocketedBallsRef.current = pocketedBalls;
            cueBallPocketedRef.current = cueBallPocketed;
          }

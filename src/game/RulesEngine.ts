@@ -197,6 +197,7 @@ export class RulesEngine {
          // Calculate points for potted balls and add to current player's score
          const pottedPoints = pottedBalls.reduce((total, ball) => total + ball.pointValue, 0);
          const currentPlayer = state.currentPlayer === 1 ? 'player1' : 'player2';
+         const oldScore = state.scores[currentPlayer];
          newState.scores = {
            ...state.scores,
            [currentPlayer]: state.scores[currentPlayer] + pottedPoints,
@@ -207,6 +208,7 @@ export class RulesEngine {
            pottedBallIds: pottedBalls.map(b => b.id),
            pointsAwarded: pottedPoints,
            awardedToPlayer: state.currentPlayer,
+           scoreTransition: `${oldScore} → ${newState.scores[currentPlayer]}`,
            newScores: newState.scores,
            newBreak: newState.currentBreak,
          });
