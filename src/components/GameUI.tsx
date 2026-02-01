@@ -1,123 +1,130 @@
 import React from 'react';
 import { GameState } from '../game/ScoreSystem';
-import { RulesEngine } from '../game/RulesEngine';
 
 interface GameUIProps {
   gameState: GameState;
   onStartGame: () => void;
   onResetGame: () => void;
+  isAiTurn?: boolean;
 }
 
-export const GameUI: React.FC<GameUIProps> = ({ gameState, onStartGame, onResetGame }) => {
+export const GameUI: React.FC<GameUIProps> = ({ gameState, onStartGame, onResetGame, isAiTurn = false }) => {
   const scores = gameState.scores;
   const currentPlayer = gameState.currentPlayer;
   const currentBreak = gameState.currentBreak;
   const isGameEnded = gameState.gamePhase === 'ended';
-  const isOnReds = RulesEngine.isOnReds(gameState);
+  const isPositioning = gameState.gamePhase === 'positioning';
 
   return (
     <div style={{
-      position: 'absolute',
-      top: '20px',
-      left: '20px',
-      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      width: '100%',
+      backgroundColor: 'rgba(0, 0, 0, 0.9)',
       color: 'white',
-      padding: '20px',
-      borderRadius: '10px',
+      padding: '8px 16px',
       fontFamily: 'Arial, sans-serif',
       zIndex: 1000,
+      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
     }}>
-      <h2>Snooker Game</h2>
-
-      {/* Scores */}
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+      {/* Row 1: Game Info */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '6px',
+        fontSize: '12px',
+      }}>
+        {/* Left side: Scores and Break */}
+        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
           <div>
-            <strong>Player 1:</strong> {scores.player1} points
+            <span style={{ color: currentPlayer === 1 && !isAiTurn ? '#4CAF50' : '#aaa' }}>
+              P1: <strong>{scores.player1}</strong>
+            </span>
           </div>
           <div>
-            <strong>Player 2:</strong> {scores.player2} points
+            <span style={{ color: currentPlayer === 2 || isAiTurn ? '#FFC107' : '#aaa' }}>
+              P2: <strong>{scores.player2}</strong>
+            </span>
+          </div>
+          <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.2)', paddingLeft: '16px' }}>
+            Break: <strong>{currentBreak}</strong>
           </div>
         </div>
 
-        <div style={{ marginBottom: '10px' }}>
-          <strong>Current Break:</strong> {currentBreak} points
-        </div>
-
-        <div style={{ marginBottom: '10px' }}>
-          <strong>Current Player:</strong> Player {currentPlayer}
-        </div>
-
-        <div style={{ marginBottom: '10px' }}>
-          <strong>Reds Remaining:</strong> {gameState.redsRemaining}
-        </div>
-
-        <div>
-          <strong>Phase:</strong> {gameState.gamePhase === 'positioning' ? 'Positioning Cue Ball' : (isOnReds ? 'On Reds' : 'On Colors')}
+        {/* Right side: Turn Status and Game Info */}
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <div>
+            {isPositioning ? (
+              <span style={{ color: '#FFC107' }}>Positioning...</span>
+            ) : isAiTurn ? (
+              <span style={{ color: '#FFC107', fontWeight: 'bold' }}>⏳ AI Turn</span>
+            ) : (
+              <span style={{ color: '#4CAF50', fontWeight: 'bold' }}>▶ Player Turn</span>
+            )}
+          </div>
+          <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.2)', paddingLeft: '16px' }}>
+            Reds: <strong>{gameState.redsRemaining}</strong>
+          </div>
         </div>
       </div>
 
-      {/* Game Controls */}
-      <div style={{ marginTop: '10px' }}>
-        {gameState.gamePhase === 'waiting' && (
+      {/* Row 2: Controls and Instructions */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        fontSize: '11px',
+      }}>
+        {/* Left side: Buttons */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {gameState.gamePhase === 'waiting' && (
+            <button
+              onClick={onStartGame}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#4CAF50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '11px',
+              }}
+            >
+              START
+            </button>
+          )}
+
           <button
-            onClick={onStartGame}
+            onClick={onResetGame}
             style={{
-              padding: '10px 20px',
-              backgroundColor: '#4CAF50',
+              padding: '6px 12px',
+              backgroundColor: '#f44336',
               color: 'white',
               border: 'none',
-              borderRadius: '5px',
+              borderRadius: '4px',
               cursor: 'pointer',
-              marginRight: '10px',
               fontWeight: 'bold',
+              fontSize: '11px',
             }}
           >
-            START GAME
+            RESET
           </button>
-        )}
-
-        <button
-          onClick={onResetGame}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#f44336',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-          }}
-        >
-          RESET GAME
-        </button>
-      </div>
-
-      {/* Game End Message */}
-      {isGameEnded && (
-        <div style={{
-          marginTop: '20px',
-          padding: '10px',
-          backgroundColor: '#4CAF50',
-          borderRadius: '5px',
-          textAlign: 'center',
-        }}>
-          <strong>Game Over!</strong><br />
-          {scores.player1 > scores.player2 ? 'Player 1 wins!' : scores.player2 > scores.player1 ? 'Player 2 wins!' : 'Draw!'}
         </div>
-      )}
 
-      {/* Instructions */}
-      <div style={{
-        marginTop: '20px',
-        fontSize: '12px',
-        color: '#ccc',
-        maxWidth: '300px',
-      }}>
-        <p><strong>How to play:</strong></p>
-        <p>• Click and drag from the cue ball to aim and set power</p>
-        <p>• Pot reds first, then colors in sequence</p>
-        <p>• Build the highest break to win!</p>
+        {/* Right side: Compact Instructions */}
+        <div style={{ color: '#999' }}>
+          {isGameEnded ? (
+            <span style={{ color: '#4CAF50', fontWeight: 'bold' }}>
+              Game Over! {scores.player1 > scores.player2 ? 'P1 wins' : scores.player2 > scores.player1 ? 'P2 wins' : 'Draw'}
+            </span>
+          ) : (
+            <span>
+              {isPositioning
+                ? 'Drag cue ball to position'
+                : 'Click & drag to aim and power'}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

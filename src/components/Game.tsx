@@ -87,7 +87,11 @@ export const Game: React.FC = () => {
     });
 
     setIsShotInProgress(true);
-    setAiShot(null); 
+    // Clear AI shot only after the physics simulation starts
+    // This prevents the animation from being re-triggered
+    setTimeout(() => {
+      setAiShot(null);
+    }, 100);
   }, [isShotInProgress, gameState.gamePhase]);
 
   const handleBallPositionUpdate = useCallback((id: string, x: number, y: number) => {
@@ -227,6 +231,20 @@ export const Game: React.FC = () => {
     };
   }, [isShotInProgress, updatePhysics]);
 
+  // Handle AI turn completion and turn switching
+  useEffect(() => {
+    if (!isShotInProgress && gameState.currentPlayer === 2 && gameState.gamePhase === 'playing' && !aiShot) {
+      // AI shot has completed and physics simulation is done
+      // Switch turn back to player 1
+      setGameState(prev => ({
+        ...prev,
+        currentPlayer: 1,
+        gamePhase: 'playing',
+      }));
+      setIsAIThinking(false);
+    }
+  }, [isShotInProgress, gameState.currentPlayer, gameState.gamePhase, aiShot]);
+
   const handleStartGame = () => {
     setGameState(prev => ({ ...prev, gamePhase: 'positioning' }));
   };
@@ -260,15 +278,18 @@ export const Game: React.FC = () => {
 
   const cueBall = balls.find(b => b.id === 'cue');
 
+  const isAiTurn = gameState.currentPlayer === 2 && gameState.gamePhase === 'playing';
+
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', backgroundColor: '#1a1a1a' }}>
+    <div style={{ position: 'relative', width: '100vw', height: '100vh', backgroundColor: '#1a1a1a', display: 'flex', flexDirection: 'column' }}>
       <GameUI
         gameState={gameState}
         onStartGame={handleStartGame}
         onResetGame={handleResetGame}
+        isAiTurn={isAiTurn}
       />
 
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
         <Stage
           ref={stageRef}
           width={TABLE_DIMENSIONS.width + TABLE_DIMENSIONS.frameWidth * 2}
@@ -292,7 +313,7 @@ export const Game: React.FC = () => {
                   cueBallY={cueBall.y}
                   onShoot={handleShoot}
                   disabled={isShotInProgress}
-                  isAiTurn={gameState.currentPlayer === 2}
+                  isAiTurn={isAiTurn}
                   aiShot={aiShot}
                   stageRef={stageRef}
                 />

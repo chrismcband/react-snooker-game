@@ -34,6 +34,8 @@ declare module 'react-konva' {
     onMouseMove?: (e: any) => void;
     onMouseUp?: (e: any) => void;
     onMouseLeave?: (e: any) => void;
+    listening?: boolean;
+    opacity?: number;
   }
   
   export interface RectProps {
@@ -49,6 +51,7 @@ declare module 'react-konva' {
     onMouseMove?: (e: any) => void;
     onMouseUp?: (e: any) => void;
     onMouseLeave?: (e: any) => void;
+    listening?: boolean;
   }
   
   export interface ArcProps {
@@ -62,6 +65,7 @@ declare module 'react-konva' {
     strokeWidth?: number;
     fill?: string | null;
     opacity?: number;
+    listening?: boolean;
   }
   
   export interface LineProps {
@@ -71,6 +75,11 @@ declare module 'react-konva' {
     opacity?: number;
     dash?: number[];
     lineCap?: string;
+    listening?: boolean;
+  }
+  
+  export interface GroupProps extends LayerProps {
+    listening?: boolean;
   }
   
   export class Stage extends Component<StageProps> {}
@@ -79,5 +88,5 @@ declare module 'react-konva' {
   export class Rect extends Component<RectProps> {}
   export class Arc extends Component<ArcProps> {}
   export class Line extends Component<LineProps> {}
-  export class Group extends Component<LayerProps> {}
+  export class Group extends Component<GroupProps> {}
 }

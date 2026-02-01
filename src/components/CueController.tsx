@@ -27,6 +27,9 @@ export const CueController: React.FC<CueControllerProps> = ({
   
   // Animation state for AI
   const [aiAnimPhase, setAiAnimPhase] = useState<'idle' | 'aiming' | 'charging' | 'releasing'>('idle');
+  
+  // Track which AI shot is currently being executed to prevent double-firing
+  const aiShotIdRef = useRef<string | null>(null);
 
   // Use refs to track latest values for the window event listeners to avoid closure issues
   const stateRef = useRef({ isCharging, power, angle, disabled, isAiTurn });
@@ -34,16 +37,31 @@ export const CueController: React.FC<CueControllerProps> = ({
     stateRef.current = { isCharging, power, angle, disabled, isAiTurn };
   }, [isCharging, power, angle, disabled, isAiTurn]);
 
-  const handleMouseDown = () => {
-    if (disabled || isAiTurn) return;
+  // Reset controller state when it's no longer AI turn (turn switched to player)
+  useEffect(() => {
+    if (!isAiTurn) {
+      setIsCharging(false);
+      setPower(0);
+      // Keep angle as is for smooth aiming
+    }
+  }, [isAiTurn]);
+
+  const handleMouseDown = (e: any) => {
+    console.log('CueController: MouseDown');
+    if (disabled || isAiTurn) {
+      console.log('CueController: Disabled or AI turn', { disabled, isAiTurn });
+      return;
+    }
     setIsCharging(true);
   };
 
   const handleMouseUpLocal = useCallback(() => {
     const { power, angle, isCharging } = stateRef.current;
+    console.log('CueController: MouseUp', { power, angle, isCharging });
     if (disabled || !isCharging || isAiTurn) return;
     
     if (power > 0.5) {
+      console.log('CueController: Shooting', { power, angle });
       onShoot(power, angle);
     }
     
@@ -51,10 +69,11 @@ export const CueController: React.FC<CueControllerProps> = ({
     setPower(0);
   }, [disabled, isAiTurn, onShoot]);
 
-  // Use window events to capture mouse movement even outside the canvas
+   // Use window events to capture mouse movement even outside the canvas
   useEffect(() => {
     const handleWindowMouseMove = (e: MouseEvent) => {
       const { disabled, isAiTurn, isCharging, angle: currentAngle } = stateRef.current;
+      // Don't process mouse move if disabled or it's AI turn
       if (disabled || isAiTurn || !stageRef.current) return;
       
       const container = stageRef.current.container();
@@ -89,7 +108,7 @@ export const CueController: React.FC<CueControllerProps> = ({
     };
 
     const handleWindowMouseUp = () => {
-      if (stateRef.current.isCharging) {
+      if (stateRef.current.isCharging && !stateRef.current.disabled && !stateRef.current.isAiTurn) {
         handleMouseUpLocal();
       }
     };
@@ -106,27 +125,38 @@ export const CueController: React.FC<CueControllerProps> = ({
   // AI Animation Logic
   useEffect(() => {
     if (isAiTurn && aiShot && aiAnimPhase === 'idle') {
-      setAiAnimPhase('aiming');
-      setAngle(aiShot.angle);
+      // Create a unique ID for this shot to prevent double-firing
+      const shotId = `${aiShot.angle}-${aiShot.power}-${Date.now()}`;
       
-      setTimeout(() => {
-        setAiAnimPhase('charging');
-        let currentPower = 0;
-        const targetPower = aiShot.power;
-        const interval = setInterval(() => {
-          currentPower += 0.5;
-          setPower(currentPower);
-          if (currentPower >= targetPower) {
-            clearInterval(interval);
-            setTimeout(() => {
-              setAiAnimPhase('releasing');
-              onShoot(targetPower, aiShot.angle);
-              setAiAnimPhase('idle');
-              setPower(0);
-            }, 500);
-          }
-        }, 20);
-      }, 1000);
+      // Only proceed if this is a new shot (not already being executed)
+      if (aiShotIdRef.current !== shotId) {
+        aiShotIdRef.current = shotId;
+        setAiAnimPhase('aiming');
+        setAngle(aiShot.angle);
+        
+        setTimeout(() => {
+          setAiAnimPhase('charging');
+          let currentPower = 0;
+          const targetPower = aiShot.power;
+          const interval = setInterval(() => {
+            currentPower += 0.5;
+            setPower(currentPower);
+            if (currentPower >= targetPower) {
+              clearInterval(interval);
+              setTimeout(() => {
+                setAiAnimPhase('releasing');
+                onShoot(targetPower, aiShot.angle);
+                // Reset animation phase AFTER calling onShoot
+                setTimeout(() => {
+                  setAiAnimPhase('idle');
+                  setPower(0);
+                  aiShotIdRef.current = null;
+                }, 100);
+              }, 500);
+            }
+          }, 20);
+        }, 1000);
+      }
     }
   }, [isAiTurn, aiShot, aiAnimPhase, onShoot]);
 
@@ -153,8 +183,9 @@ export const CueController: React.FC<CueControllerProps> = ({
         y={-TABLE_DIMENSIONS.frameWidth}
         width={TABLE_DIMENSIONS.width + TABLE_DIMENSIONS.frameWidth * 2}
         height={TABLE_DIMENSIONS.height + TABLE_DIMENSIONS.frameWidth * 2}
-        fill="transparent"
+        fill="rgba(0,0,0,0)"
         onMouseDown={handleMouseDown}
+        listening={!disabled && !isAiTurn}
       />
 
       {!disabled && (
@@ -164,11 +195,12 @@ export const CueController: React.FC<CueControllerProps> = ({
           strokeWidth={1}
           opacity={0.2}
           dash={[10, 10]}
+          listening={false}
         />
       )}
       
       {!disabled && (
-        <Group>
+        <Group listening={false}>
           <Line
             points={[cueStartX, cueStartY, cueEndX, cueEndY]}
             stroke="#4A2F1B"
@@ -203,6 +235,7 @@ export const CueController: React.FC<CueControllerProps> = ({
           stroke="#FF0000"
           strokeWidth={2}
           opacity={0.5}
+          listening={false}
         />
       )}
     </Group>
