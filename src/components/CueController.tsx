@@ -126,6 +126,14 @@ export const CueController: React.FC<CueControllerProps> = ({
    useEffect(() => {
      console.log('AI Animation Check:', { isAiTurn, aiShot: aiShot ? 'present' : 'none', aiAnimPhase });
 
+     // If aiShot was cleared, reset animation phase
+     if (!aiShot && aiAnimPhase !== 'idle') {
+       console.log('aiShot cleared, resetting animation phase to idle');
+       setAiAnimPhase('idle');
+       setPower(0);
+       return;
+     }
+
      if (isAiTurn && aiShot && aiAnimPhase === 'idle') {
        // Create a stable ID for this shot based on angle and power (no timestamp)
        const shotId = `${aiShot.angle.toFixed(4)}-${aiShot.power.toFixed(4)}`;
@@ -150,12 +158,7 @@ export const CueController: React.FC<CueControllerProps> = ({
                  setAiAnimPhase('releasing');
                  console.log('AI SHOOTING with power:', targetPower, 'angle:', aiShot.angle);
                  onShoot(targetPower, aiShot.angle);
-                 // Reset animation phase AFTER calling onShoot
-                 setTimeout(() => {
-                   setAiAnimPhase('idle');
-                   setPower(0);
-                   // Don't clear aiShotIdRef here - only clear it when aiShot becomes null
-                 }, 100);
+                 // Don't reset animation phase here - let it be reset when aiShot becomes null
                }, 500);
              }
            }, 20);
@@ -163,12 +166,6 @@ export const CueController: React.FC<CueControllerProps> = ({
        } else {
          console.log('✗ AI shot already being executed, skipping');
        }
-     }
-     
-     // Clear the shot ID when aiShot is cleared (shot has been fully processed)
-     if (!aiShot && aiShotIdRef.current !== null) {
-       console.log('Clearing AI shot ID ref');
-       aiShotIdRef.current = null;
      }
    }, [isAiTurn, aiShot, aiAnimPhase, onShoot]);
 
