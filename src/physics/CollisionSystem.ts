@@ -97,9 +97,14 @@ export class CollisionSystem {
   }
 
   // Apply friction to slow down balls
-  public static applyFriction(ball: Ball, frictionCoefficient: number = 0.985): void {
-    ball.vx *= frictionCoefficient;
-    ball.vy *= frictionCoefficient;
+  // Using exponential decay formula: v_new = v_old * (frictionCoefficient ^ deltaTime)
+  // This makes friction frame-rate independent
+  public static applyFriction(ball: Ball, frictionCoefficient: number = 0.985, deltaTime: number = 1): void {
+    // Apply friction proportionally to delta time
+    // The friction coefficient is raised to the power of deltaTime to maintain consistent deceleration
+    const frictionFactor = Math.pow(frictionCoefficient, deltaTime);
+    ball.vx *= frictionFactor;
+    ball.vy *= frictionFactor;
 
     // Stop ball if velocity is very small
     if (Math.abs(ball.vx) < 0.01) ball.vx = 0;

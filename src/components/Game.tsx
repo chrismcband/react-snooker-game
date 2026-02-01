@@ -49,9 +49,10 @@ export const Game: React.FC = () => {
   const pocketedBallsRef = useRef<BallType[]>([]);
   const cueBallPocketedRef = useRef<boolean>(false);
   const shotJustEndedRef = useRef<boolean>(false);
-  const firstBallHitRef = useRef<BallType | null>(null);
+   const firstBallHitRef = useRef<BallType | null>(null);
+   const lastFrameTimeRef = useRef<number>(0);
 
-    const balls = gameState.balls;
+     const balls = gameState.balls;
     
      // Calculate stage dimensions with space for cue rendering
      const cueRenderingSpace = 100; // Space around table for cue stick rendering
@@ -243,22 +244,31 @@ export const Game: React.FC = () => {
      return { x: x + layerX, y: y + layerY };
    }, []);
 
-  // Physics update loop
-  const updatePhysics = useCallback(() => {
-    if (!isShotInProgress) return;
+   // Physics update loop
+   const updatePhysics = useCallback(() => {
+     if (!isShotInProgress) return;
 
-    setGameState(prev => {
-      const newBalls = prev.balls.map(b => ({ ...b }));
-      let anyBallsMoving = false;
+     setGameState(prev => {
+       // Calculate delta time for frame-rate independent physics
+       const currentTime = performance.now();
+       let deltaTime = 0.016; // Default to ~60fps (16ms)
+       
+       if (lastFrameTimeRef.current > 0) {
+         deltaTime = Math.min((currentTime - lastFrameTimeRef.current) / 1000, 0.05); // Cap at 50ms to prevent huge jumps
+       }
+       lastFrameTimeRef.current = currentTime;
 
-      // Update each ball
-      for (let i = 0; i < newBalls.length; i++) {
-        const ball = newBalls[i];
-        if (ball.isPocketed) continue;
+       const newBalls = prev.balls.map(b => ({ ...b }));
+       let anyBallsMoving = false;
 
-        CollisionSystem.applyFriction(ball, PHYSICS_CONSTANTS.friction);
-        CollisionSystem.updateBallPosition(ball);
-        CollisionSystem.resolveCushionCollision(ball, PHYSICS_CONSTANTS.restitution);
+       // Update each ball
+       for (let i = 0; i < newBalls.length; i++) {
+         const ball = newBalls[i];
+         if (ball.isPocketed) continue;
+
+         CollisionSystem.applyFriction(ball, PHYSICS_CONSTANTS.friction, deltaTime);
+         CollisionSystem.updateBallPosition(ball, deltaTime);
+         CollisionSystem.resolveCushionCollision(ball, PHYSICS_CONSTANTS.restitution);
 
         if (CollisionSystem.isBallMoving(ball)) {
           anyBallsMoving = true;
