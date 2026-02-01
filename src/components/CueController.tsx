@@ -122,43 +122,49 @@ export const CueController: React.FC<CueControllerProps> = ({
     };
   }, [cueBallX, cueBallY, onShoot, stageRef, handleMouseUpLocal]);
 
-  // AI Animation Logic
-  useEffect(() => {
-    if (isAiTurn && aiShot && aiAnimPhase === 'idle') {
-      // Create a unique ID for this shot to prevent double-firing
-      const shotId = `${aiShot.angle}-${aiShot.power}-${Date.now()}`;
-      
-      // Only proceed if this is a new shot (not already being executed)
-      if (aiShotIdRef.current !== shotId) {
-        aiShotIdRef.current = shotId;
-        setAiAnimPhase('aiming');
-        setAngle(aiShot.angle);
-        
-        setTimeout(() => {
-          setAiAnimPhase('charging');
-          let currentPower = 0;
-          const targetPower = aiShot.power;
-          const interval = setInterval(() => {
-            currentPower += 0.5;
-            setPower(currentPower);
-            if (currentPower >= targetPower) {
-              clearInterval(interval);
-              setTimeout(() => {
-                setAiAnimPhase('releasing');
-                onShoot(targetPower, aiShot.angle);
-                // Reset animation phase AFTER calling onShoot
-                setTimeout(() => {
-                  setAiAnimPhase('idle');
-                  setPower(0);
-                  aiShotIdRef.current = null;
-                }, 100);
-              }, 500);
-            }
-          }, 20);
-        }, 1000);
-      }
-    }
-  }, [isAiTurn, aiShot, aiAnimPhase, onShoot]);
+   // AI Animation Logic
+   useEffect(() => {
+     console.log('AI Animation Check:', { isAiTurn, aiShot: aiShot ? 'present' : 'none', aiAnimPhase });
+
+     if (isAiTurn && aiShot && aiAnimPhase === 'idle') {
+       // Create a unique ID for this shot to prevent double-firing
+       const shotId = `${aiShot.angle}-${aiShot.power}-${Date.now()}`;
+       
+       // Only proceed if this is a new shot (not already being executed)
+       if (aiShotIdRef.current !== shotId) {
+         console.log('✓ AI ANIMATION STARTING - angle:', aiShot.angle, 'power:', aiShot.power);
+         aiShotIdRef.current = shotId;
+         setAiAnimPhase('aiming');
+         setAngle(aiShot.angle);
+         
+         setTimeout(() => {
+           setAiAnimPhase('charging');
+           let currentPower = 0;
+           const targetPower = aiShot.power;
+           const interval = setInterval(() => {
+             currentPower += 0.5;
+             setPower(currentPower);
+             if (currentPower >= targetPower) {
+               clearInterval(interval);
+               setTimeout(() => {
+                 setAiAnimPhase('releasing');
+                 console.log('AI SHOOTING with power:', targetPower, 'angle:', aiShot.angle);
+                 onShoot(targetPower, aiShot.angle);
+                 // Reset animation phase AFTER calling onShoot
+                 setTimeout(() => {
+                   setAiAnimPhase('idle');
+                   setPower(0);
+                   aiShotIdRef.current = null;
+                 }, 100);
+               }, 500);
+             }
+           }, 20);
+         }, 1000);
+       } else {
+         console.log('✗ AI shot already being executed, skipping');
+       }
+     }
+   }, [isAiTurn, aiShot, aiAnimPhase, onShoot]);
 
   const getCueStickPosition = () => {
     const stickLength = 300;

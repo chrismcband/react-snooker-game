@@ -39,6 +39,8 @@ export const Game: React.FC = () => {
   const animationFrameRef = useRef<number | null>(null);
   const stageRef = useRef<any>(null);
   const aiShotFiredRef = useRef<boolean>(false);
+  const aiShotExecutedRef = useRef<boolean>(false);
+  const ballsPottedThisShotRef = useRef<number>(0);
 
   const balls = gameState.balls;
 
@@ -69,6 +71,15 @@ export const Game: React.FC = () => {
 
    // AI Shot Triggering (when AI player needs to take a shot)
    useEffect(() => {
+     console.log('AI Shot Trigger Check:', {
+       gamePhase: gameState.gamePhase,
+       currentPlayer: gameState.currentPlayer,
+       isShotInProgress,
+       isAIThinking,
+       aiShot: aiShot ? 'queued' : 'none',
+       aiShotFired: aiShotFiredRef.current,
+     });
+
      if (
        gameState.gamePhase === 'playing' &&
        gameState.currentPlayer === 2 &&
@@ -78,26 +89,39 @@ export const Game: React.FC = () => {
        !aiShotFiredRef.current  // Only trigger if we haven't already fired a shot this turn
      ) {
        setIsAIThinking(true);
-       console.log('AI thinking, will calculate shot in 1s');
-       
-       // Delay AI shot for realism
+       console.log('✓ AI TRIGGER CONDITIONS MET - thinking, will calculate shot in 1s');
+     }
+   }, [gameState.gamePhase, gameState.currentPlayer, isShotInProgress, isAIThinking, aiShot]);
+
+   // Calculate AI shot after thinking delay
+   useEffect(() => {
+     if (isAIThinking && gameState.currentPlayer === 2 && !aiShot) {
        const timeoutId = setTimeout(() => {
-         console.log('Calculating AI shot');
+         console.log('Calculating AI shot with current gameState balls:', gameState.balls.length);
          const shot = AIEngine.calculateShot(gameState);
          if (shot) {
-           console.log('AI shot calculated:', shot);
+           console.log('✓ AI shot calculated:', shot);
            aiShotFiredRef.current = true;
            setAiShot(shot);
+         } else {
+           console.log('✗ AI shot calculation returned null');
          }
          setIsAIThinking(false);
        }, 1000);
        
        return () => clearTimeout(timeoutId);
      }
-   }, [gameState.gamePhase, gameState.currentPlayer, isShotInProgress, isAIThinking, aiShot]);
+   }, [isAIThinking, gameState, aiShot]);
 
   const handleShoot = useCallback((power: number, angle: number) => {
     if (isShotInProgress || (gameState.gamePhase !== 'playing')) return;
+
+    // Mark if this is an AI shot
+    const isAiShooting = gameState.currentPlayer === 2;
+    if (isAiShooting) {
+      console.log('AI executing shot via handleShoot');
+      aiShotExecutedRef.current = true;
+    }
 
     setGameState(prev => {
       const newBalls = prev.balls.map(b => ({ ...b }));
@@ -117,7 +141,7 @@ export const Game: React.FC = () => {
     setTimeout(() => {
       setAiShot(null);
     }, 100);
-  }, [isShotInProgress, gameState.gamePhase]);
+  }, [isShotInProgress, gameState.gamePhase, gameState.currentPlayer]);
 
   const handleBallPositionUpdate = useCallback((id: string, x: number, y: number) => {
     if (isShotInProgress) return; 
@@ -199,40 +223,43 @@ export const Game: React.FC = () => {
         }
       }
 
-      // Check for pocketed balls
-      const pocketedBalls: BallType[] = [];
-      let cueBallPocketed = false;
-      newBalls.forEach(ball => {
-        if (!ball.isPocketed && PocketSystem.shouldRemoveBall(ball)) {
-          ball.isPocketed = true;
-          if (ball.id === 'cue') {
-            cueBallPocketed = true;
-          } else {
-            pocketedBalls.push(ball);
-          }
-        }
-      });
-
-       let nextState = { ...prev, balls: newBalls };
-
-       // Handle pocketed balls during the shot
-       if (pocketedBalls.length > 0 || cueBallPocketed) {
-         pocketedBalls.forEach(ball => {
-           nextState = ScoreSystem.handleBallPotted(nextState, ball);
-         });
-         nextState = RulesEngine.processShotResult(nextState, pocketedBalls, cueBallPocketed);
-       }
-
-       // Stop animation when all balls have stopped
-       if (!anyBallsMoving) {
-         // If no balls were potted and no foul, switch turns
-         if (pocketedBalls.length === 0 && !cueBallPocketed && !nextState.foulCommitted) {
-           nextState = RulesEngine.processShotResult(nextState, [], false);
+       // Check for pocketed balls
+       const pocketedBalls: BallType[] = [];
+       let cueBallPocketed = false;
+       newBalls.forEach(ball => {
+         if (!ball.isPocketed && PocketSystem.shouldRemoveBall(ball)) {
+           ball.isPocketed = true;
+           if (ball.id === 'cue') {
+             cueBallPocketed = true;
+           } else {
+             pocketedBalls.push(ball);
+           }
          }
+       });
 
-         // Mark that we should end the shot on the next frame
-         setShotJustEnded(true);
-       }
+        let nextState = { ...prev, balls: newBalls };
+
+        // Handle pocketed balls during the shot
+        if (pocketedBalls.length > 0 || cueBallPocketed) {
+          pocketedBalls.forEach(ball => {
+            nextState = ScoreSystem.handleBallPotted(nextState, ball);
+          });
+          nextState = RulesEngine.processShotResult(nextState, pocketedBalls, cueBallPocketed);
+        }
+
+        // Stop animation when all balls have stopped
+        if (!anyBallsMoving) {
+          // If no balls were potted and no foul, switch turns
+          if (pocketedBalls.length === 0 && !cueBallPocketed && !nextState.foulCommitted) {
+            nextState = RulesEngine.processShotResult(nextState, [], false);
+          }
+
+          // Track how many balls were potted this shot for turn logic
+          ballsPottedThisShotRef.current = pocketedBalls.length;
+
+          // Mark that we should end the shot on the next frame
+          setShotJustEnded(true);
+        }
 
        return nextState;
     });
@@ -267,31 +294,50 @@ export const Game: React.FC = () => {
      }
    }, [shotJustEnded, gameState.currentPlayer]);
 
-    // Handle AI turn completion and switch back to player
+    // Handle turn switching after shot completes
     useEffect(() => {
-     // Only switch back to player 1 when:
-     // 1. AI shot has been fired (aiShotFiredRef.current === true)
+     // Switch turn back to opponent when:
+     // 1. Shot has been executed
      // 2. Shot is no longer in progress (all balls stopped)
-     // 3. AI is not thinking anymore
-     // 4. Current player is still 2
+     // 3. NO balls were potted this shot (player loses turn if miss)
+     // 4. No foul was committed
      if (
-       aiShotFiredRef.current &&
+       aiShotExecutedRef.current &&
        !isShotInProgress &&
-       gameState.currentPlayer === 2 &&
        gameState.gamePhase === 'playing' &&
-       !isAIThinking
+       ballsPottedThisShotRef.current === 0 &&
+       !gameState.foulCommitted
      ) {
-       // AI shot has completed and physics simulation is done
-       // Switch turn back to player 1
-       console.log('Switching turn from AI (player 2) back to Player 1');
-       aiShotFiredRef.current = false;  // Reset for next AI turn
+       // Shot completed with no balls potted and no foul
+       // Switch turn to opponent
+       const isPlayerTurn = gameState.currentPlayer === 1;
+       console.log(`Shot completed - no balls potted. Switching from Player ${gameState.currentPlayer} to Player ${isPlayerTurn ? 2 : 1}`);
+       
+       // Reset refs for next shot
+       aiShotFiredRef.current = false;
+       aiShotExecutedRef.current = false;
+       ballsPottedThisShotRef.current = 0;
+       
        setGameState(prev => ({
          ...prev,
-         currentPlayer: 1,
+         currentPlayer: isPlayerTurn ? 2 : 1,
          gamePhase: 'playing',
        }));
+     } else if (
+       aiShotExecutedRef.current &&
+       !isShotInProgress &&
+       gameState.gamePhase === 'playing' &&
+       (ballsPottedThisShotRef.current > 0 || gameState.foulCommitted)
+     ) {
+       // Balls were potted or foul committed - same player gets another turn
+       console.log(`Shot completed - ${ballsPottedThisShotRef.current > 0 ? 'balls potted' : 'foul committed'}. Player ${gameState.currentPlayer} keeps their turn`);
+       
+       // Reset refs for next shot
+       aiShotFiredRef.current = false;
+       aiShotExecutedRef.current = false;
+       ballsPottedThisShotRef.current = 0;
      }
-    }, [isShotInProgress, gameState.currentPlayer, gameState.gamePhase, isAIThinking]);
+    }, [isShotInProgress, gameState.currentPlayer, gameState.gamePhase, gameState.foulCommitted]);
 
   const handleStartGame = () => {
     setGameState(prev => ({ ...prev, gamePhase: 'positioning' }));
