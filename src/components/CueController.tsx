@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Line, Circle, Group, Rect } from 'react-konva';
 import { BALL_PROPERTIES, TABLE_DIMENSIONS } from '../utils/constants';
 
@@ -9,6 +9,7 @@ interface CueControllerProps {
   disabled?: boolean;
   isAiTurn?: boolean;
   aiShot?: { angle: number; power: number } | null;
+  stageRef: React.RefObject<any>;
 }
 
 export const CueController: React.FC<CueControllerProps> = ({
@@ -18,6 +19,7 @@ export const CueController: React.FC<CueControllerProps> = ({
   disabled = false,
   isAiTurn = false,
   aiShot = null,
+  stageRef,
 }) => {
   const [isCharging, setIsCharging] = useState(false);
   const [power, setPower] = useState(0);
@@ -26,40 +28,19 @@ export const CueController: React.FC<CueControllerProps> = ({
   // Animation state for AI
   const [aiAnimPhase, setAiAnimPhase] = useState<'idle' | 'aiming' | 'charging' | 'releasing'>('idle');
 
-  const handleMouseDown = (e: any) => {
+  // Use refs to track latest values for the window event listeners to avoid closure issues
+  const stateRef = useRef({ isCharging, power, angle, disabled, isAiTurn });
+  useEffect(() => {
+    stateRef.current = { isCharging, power, angle, disabled, isAiTurn };
+  }, [isCharging, power, angle, disabled, isAiTurn]);
+
+  const handleMouseDown = () => {
     if (disabled || isAiTurn) return;
     setIsCharging(true);
   };
 
-  const handleMouseMove = (e: any) => {
-    if (disabled || isAiTurn) return;
-    
-    const pos = e.target.getStage().getPointerPosition();
-    const stageX = pos.x - TABLE_DIMENSIONS.frameWidth;
-    const stageY = pos.y - TABLE_DIMENSIONS.frameWidth;
-    
-    const dx = stageX - cueBallX;
-    const dy = stageY - cueBallY;
-    
-    if (!isCharging) {
-      // Angle points from cursor TO ball
-      const newAngle = Math.atan2(-dy, -dx);
-      setAngle(newAngle);
-    } else {
-      const maxPower = 30;
-      // aim vector (cursor -> ball)
-      const aimX = Math.cos(angle);
-      const aimY = Math.sin(angle);
-      // pullDist is positive when mouse is pulled AWAY from the ball (opposite of aim)
-      // Vector ball -> cursor is (dx, dy)
-      // Dot product of (dx, dy) and (-aimX, -aimY)
-      const pullDist = (dx * -aimX + dy * -aimY); 
-      const calculatedPower = Math.min(Math.max(pullDist / 10, 0), maxPower);
-      setPower(calculatedPower);
-    }
-  };
-
-  const handleMouseUp = () => {
+  const handleMouseUpLocal = () => {
+    const { power, angle, isCharging } = stateRef.current;
     if (disabled || !isCharging || isAiTurn) return;
     
     if (power > 0.5) {
@@ -70,14 +51,64 @@ export const CueController: React.FC<CueControllerProps> = ({
     setPower(0);
   };
 
+  // Use window events to capture mouse movement even outside the canvas
+  useEffect(() => {
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      const { disabled, isAiTurn, isCharging, angle: currentAngle } = stateRef.current;
+      if (disabled || isAiTurn || !stageRef.current) return;
+      
+      const container = stageRef.current.container();
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      
+      const pos = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+      
+      const stageX = pos.x - TABLE_DIMENSIONS.frameWidth;
+      const stageY = pos.y - TABLE_DIMENSIONS.frameWidth;
+      
+      const dx = stageX - cueBallX;
+      const dy = stageY - cueBallY;
+      
+      if (!isCharging) {
+        // Angle points from cursor TO ball
+        const newAngle = Math.atan2(-dy, -dx);
+        setAngle(newAngle);
+      } else {
+        const maxPower = 30;
+        // aim vector (cursor -> ball)
+        const aimX = Math.cos(currentAngle);
+        const aimY = Math.sin(currentAngle);
+        // pullDist is positive when mouse is pulled AWAY from the ball (opposite of aim)
+        const pullDist = (dx * -aimX + dy * -aimY); 
+        const calculatedPower = Math.min(Math.max(pullDist / 10, 0), maxPower);
+        setPower(calculatedPower);
+      }
+    };
+
+    const handleWindowMouseUp = () => {
+      if (stateRef.current.isCharging) {
+        handleMouseUpLocal();
+      }
+    };
+
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    window.addEventListener('mouseup', handleWindowMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+    };
+  }, [cueBallX, cueBallY, onShoot, stageRef]);
+
   // AI Animation Logic
   useEffect(() => {
     if (isAiTurn && aiShot && aiAnimPhase === 'idle') {
       setAiAnimPhase('aiming');
-      // Set angle instantly or could animate it
       setAngle(aiShot.angle);
       
-      // Charging
       setTimeout(() => {
         setAiAnimPhase('charging');
         let currentPower = 0;
@@ -87,7 +118,6 @@ export const CueController: React.FC<CueControllerProps> = ({
           setPower(currentPower);
           if (currentPower >= targetPower) {
             clearInterval(interval);
-            // Release
             setTimeout(() => {
               setAiAnimPhase('releasing');
               onShoot(targetPower, aiShot.angle);
@@ -117,6 +147,7 @@ export const CueController: React.FC<CueControllerProps> = ({
 
   return (
     <Group>
+      {/* Hit area */}
       <Rect
         x={-TABLE_DIMENSIONS.frameWidth}
         y={-TABLE_DIMENSIONS.frameWidth}
@@ -124,9 +155,6 @@ export const CueController: React.FC<CueControllerProps> = ({
         height={TABLE_DIMENSIONS.height + TABLE_DIMENSIONS.frameWidth * 2}
         fill="transparent"
         onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
       />
 
       {!disabled && (

@@ -113,29 +113,24 @@ export const Game: React.FC = () => {
     const centerY = frame + TABLE_DIMENSIONS.height / 2;
     const radius = TABLE_MARKINGS.dRadius;
     
-    // Convert absolute pos to relative to table start (which is at frame, frame)
-    let relX = pos.x - frame;
-    let relY = pos.y - frame;
+    let x = pos.x;
+    let y = pos.y;
     
-    // 1. Clamp x to be on the left side of the baulk line (relX <= baulkLineX)
-    relX = Math.min(relX, TABLE_MARKINGS.baulkLineX);
+    // 1. Clamp x to be on the left side of the baulk line
+    x = Math.min(x, centerX);
     
     // 2. Clamp to D semi-circle
-    const dx = (relX + frame) - centerX;
-    const dy = (relY + frame) - centerY;
+    const dx = x - centerX;
+    const dy = y - centerY;
     const dist = Math.sqrt(dx * dx + dy * dy);
     
     if (dist > radius) {
       const ratio = radius / dist;
-      relX = (centerX - frame) + dx * ratio;
-      relY = (centerY - frame) + dy * ratio;
+      x = centerX + dx * ratio;
+      y = centerY + dy * ratio;
     }
     
-    // Return absolute position
-    return { 
-      x: relX + frame, 
-      y: relY + frame 
-    };
+    return { x, y };
   }, []);
 
   // Physics update loop
@@ -263,6 +258,7 @@ export const Game: React.FC = () => {
   };
 
   const cueBall = balls.find(b => b.id === 'cue');
+  const stageRef = useRef<any>(null);
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', backgroundColor: '#1a1a1a' }}>
@@ -274,6 +270,7 @@ export const Game: React.FC = () => {
 
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <Stage
+          ref={stageRef}
           width={TABLE_DIMENSIONS.width + TABLE_DIMENSIONS.frameWidth * 2}
           height={TABLE_DIMENSIONS.height + TABLE_DIMENSIONS.frameWidth * 2}
         >
@@ -297,6 +294,7 @@ export const Game: React.FC = () => {
                   disabled={isShotInProgress}
                   isAiTurn={gameState.currentPlayer === 2}
                   aiShot={aiShot}
+                  stageRef={stageRef}
                 />
               )}
             </Table>
