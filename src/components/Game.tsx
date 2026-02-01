@@ -33,24 +33,25 @@ export const Game: React.FC = () => {
     };
   });
   
-  const [isShotInProgress, setIsShotInProgress] = useState(false);
-  const [shotJustEnded, setShotJustEnded] = useState(false);
-  const [isAIThinking, setIsAIThinking] = useState(false);
-  const [aiShot, setAiShot] = useState<{ angle: number; power: number } | null>(null);
-  const [foulNotification, setFoulNotification] = useState<string | null>(null);
-   const animationFrameRef = useRef<number | null>(null);
-   const stageRef = useRef<any>(null);
-   const containerRef = useRef<HTMLDivElement>(null);
-   const aiShotFiredRef = useRef<boolean>(false);
-  const aiShotExecutedRef = useRef<boolean>(false);
-  const ballsPottedThisShotRef = useRef<number>(0);
-  const shotResultProcessedRef = useRef<boolean>(false);
-  const ballsPottedCounterRef = useRef<number>(0);
-  const pocketedBallsRef = useRef<BallType[]>([]);
-  const cueBallPocketedRef = useRef<boolean>(false);
-  const shotJustEndedRef = useRef<boolean>(false);
-   const firstBallHitRef = useRef<BallType | null>(null);
-   const lastFrameTimeRef = useRef<number>(0);
+   const [isShotInProgress, setIsShotInProgress] = useState(false);
+   const [shotJustEnded, setShotJustEnded] = useState(false);
+   const [isAIThinking, setIsAIThinking] = useState(false);
+   const [aiShot, setAiShot] = useState<{ angle: number; power: number } | null>(null);
+   const [foulNotification, setFoulNotification] = useState<string | null>(null);
+    const animationFrameRef = useRef<number | null>(null);
+    const stageRef = useRef<any>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const aiShotFiredRef = useRef<boolean>(false);
+   const aiShotExecutedRef = useRef<boolean>(false);
+   const ballsPottedThisShotRef = useRef<number>(0);
+   const shotResultProcessedRef = useRef<boolean>(false);
+   const ballsPottedCounterRef = useRef<number>(0);
+   const pocketedBallsRef = useRef<BallType[]>([]);
+   const cueBallPocketedRef = useRef<boolean>(false);
+   const shotJustEndedRef = useRef<boolean>(false);
+    const firstBallHitRef = useRef<BallType | null>(null);
+    const lastFrameTimeRef = useRef<number>(0);
+    const isShotInProgressRef = useRef<boolean>(false);
 
      const balls = gameState.balls;
     
@@ -70,16 +71,21 @@ export const Game: React.FC = () => {
      const scaleY = maxViewportHeight / unscaledHeight;
      const scale = Math.min(scaleX, scaleY, 1); // Don't scale up, only down
 
-   // Debug logging
+   // Sync isShotInProgress to ref so callbacks can access it
    useEffect(() => {
-    console.log('Game State Updated:', {
-      currentPlayer: gameState.currentPlayer,
-      gamePhase: gameState.gamePhase,
-      isShotInProgress,
-      isAIThinking,
-      aiShot: aiShot ? 'queued' : 'none',
-    });
-  }, [gameState.currentPlayer, gameState.gamePhase, isShotInProgress, isAIThinking, aiShot]);
+     isShotInProgressRef.current = isShotInProgress;
+   }, [isShotInProgress]);
+
+   // Debug logging
+    useEffect(() => {
+     console.log('Game State Updated:', {
+       currentPlayer: gameState.currentPlayer,
+       gamePhase: gameState.gamePhase,
+       isShotInProgress,
+       isAIThinking,
+       aiShot: aiShot ? 'queued' : 'none',
+     });
+   }, [gameState.currentPlayer, gameState.gamePhase, isShotInProgress, isAIThinking, aiShot]);
 
    // AI Positioning (when AI player needs to position cue ball)
    useEffect(() => {
@@ -250,12 +256,13 @@ export const Game: React.FC = () => {
 
     // Physics update loop
     const updatePhysics = useCallback(() => {
-      console.log('[Physics] updatePhysics frame running, isShotInProgress:', isShotInProgress);
-      
-      if (!isShotInProgress) {
+      // Use ref to avoid stale closure issues
+      if (!isShotInProgressRef.current) {
         console.log('[Physics] Shot no longer in progress, stopping physics loop');
         return;
       }
+      
+      console.log('[Physics] updatePhysics frame running');
 
       setGameState(prev => {
         // Calculate delta time for frame-rate independent physics
@@ -373,23 +380,23 @@ export const Game: React.FC = () => {
      });
      
      // Request next frame while shot is still in progress
-     if (isShotInProgress) {
+     // Use ref to check state without causing re-renders or closure issues
+     if (isShotInProgressRef.current) {
        animationFrameRef.current = requestAnimationFrame(updatePhysics);
      }
-   }, [isShotInProgress]);
+   }, []); // Empty dependency array - function is self-scheduling
 
    useEffect(() => {
      // This effect just sets up the initial request when shot starts
      if (isShotInProgress && !animationFrameRef.current) {
        console.log('[Physics] Initial requestAnimationFrame for shot');
        animationFrameRef.current = requestAnimationFrame(updatePhysics);
-     } else if (!isShotInProgress && animationFrameRef.current) {
-       cancelAnimationFrame(animationFrameRef.current);
-       animationFrameRef.current = null;
      }
 
      return () => {
-       if (animationFrameRef.current) {
+       // Clean up on unmount or when shot ends
+       if (!isShotInProgress && animationFrameRef.current) {
+         console.log('[Physics] Cancelling animation frame, shot ended');
          cancelAnimationFrame(animationFrameRef.current);
          animationFrameRef.current = null;
        }
