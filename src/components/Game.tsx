@@ -36,6 +36,7 @@ export const Game: React.FC = () => {
   const [isAIThinking, setIsAIThinking] = useState(false);
   const [aiShot, setAiShot] = useState<{ angle: number; power: number } | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const stageRef = useRef<any>(null);
 
   const balls = gameState.balls;
 
@@ -74,7 +75,7 @@ export const Game: React.FC = () => {
     if (isShotInProgress || (gameState.gamePhase !== 'playing')) return;
 
     setGameState(prev => {
-      const newBalls = [...prev.balls];
+      const newBalls = prev.balls.map(b => ({ ...b }));
       const cueBall = newBalls.find(b => b.id === 'cue');
 
       if (cueBall) {
@@ -258,7 +259,6 @@ export const Game: React.FC = () => {
   };
 
   const cueBall = balls.find(b => b.id === 'cue');
-  const stageRef = useRef<any>(null);
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', backgroundColor: '#1a1a1a' }}>

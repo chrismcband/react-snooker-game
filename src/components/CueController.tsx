@@ -39,7 +39,7 @@ export const CueController: React.FC<CueControllerProps> = ({
     setIsCharging(true);
   };
 
-  const handleMouseUpLocal = () => {
+  const handleMouseUpLocal = useCallback(() => {
     const { power, angle, isCharging } = stateRef.current;
     if (disabled || !isCharging || isAiTurn) return;
     
@@ -49,7 +49,7 @@ export const CueController: React.FC<CueControllerProps> = ({
     
     setIsCharging(false);
     setPower(0);
-  };
+  }, [disabled, isAiTurn, onShoot]);
 
   // Use window events to capture mouse movement even outside the canvas
   useEffect(() => {
