@@ -114,13 +114,20 @@ export const Game: React.FC = () => {
    }, [isAIThinking, gameState, aiShot]);
 
   const handleShoot = useCallback((power: number, angle: number) => {
-    if (isShotInProgress || (gameState.gamePhase !== 'playing')) return;
+    console.log('handleShoot called:', { power, angle, isShotInProgress, gamePhase: gameState.gamePhase, currentPlayer: gameState.currentPlayer });
+    
+    if (isShotInProgress || (gameState.gamePhase !== 'playing')) {
+      console.log('handleShoot IGNORED - isShotInProgress or not playing');
+      return;
+    }
 
     // Mark if this is an AI shot
     const isAiShooting = gameState.currentPlayer === 2;
     if (isAiShooting) {
-      console.log('AI executing shot via handleShoot');
+      console.log('✓ AI executing shot via handleShoot - marking aiShotExecutedRef = true');
       aiShotExecutedRef.current = true;
+    } else {
+      console.log('✓ Player executing shot via handleShoot');
     }
 
     setGameState(prev => {
@@ -139,6 +146,7 @@ export const Game: React.FC = () => {
     // Clear AI shot only after the physics simulation starts
     // This prevents the animation from being re-triggered
     setTimeout(() => {
+      console.log('Clearing aiShot after physics starts');
       setAiShot(null);
     }, 100);
   }, [isShotInProgress, gameState.gamePhase, gameState.currentPlayer]);
