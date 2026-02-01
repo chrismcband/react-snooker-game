@@ -33,6 +33,7 @@ export const Game: React.FC = () => {
   });
   
   const [isShotInProgress, setIsShotInProgress] = useState(false);
+  const [shotJustEnded, setShotJustEnded] = useState(false);
   const [isAIThinking, setIsAIThinking] = useState(false);
   const [aiShot, setAiShot] = useState<{ angle: number; power: number } | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -40,36 +41,57 @@ export const Game: React.FC = () => {
 
   const balls = gameState.balls;
 
-  // AI Turn Handling
+  // Debug logging
   useEffect(() => {
-    const phase = gameState.gamePhase;
-    const currentPlayer = gameState.currentPlayer;
+    console.log('Game State Updated:', {
+      currentPlayer: gameState.currentPlayer,
+      gamePhase: gameState.gamePhase,
+      isShotInProgress,
+      isAIThinking,
+      aiShot: aiShot ? 'queued' : 'none',
+    });
+  }, [gameState.currentPlayer, gameState.gamePhase, isShotInProgress, isAIThinking, aiShot]);
 
-    if (phase === 'positioning' && currentPlayer === 2) {
-      // AI positions ball instantly
-      const x = TABLE_MARKINGS.baulkLineX - 10;
-      const y = TABLE_DIMENSIONS.height / 2;
-      
-      setGameState(prev => {
-        const newBalls = prev.balls.map(b => b.id === 'cue' ? { ...b, x, y, isPocketed: false } : b);
-        return { ...prev, balls: newBalls, gamePhase: 'playing' };
-      });
-      return;
-    }
+   // AI Positioning (when AI player needs to position cue ball)
+   useEffect(() => {
+     if (gameState.gamePhase === 'positioning' && gameState.currentPlayer === 2) {
+       // AI positions ball instantly
+       const x = TABLE_MARKINGS.baulkLineX - 10;
+       const y = TABLE_DIMENSIONS.height / 2;
+       
+       setGameState(prev => {
+         const newBalls = prev.balls.map(b => b.id === 'cue' ? { ...b, x, y, isPocketed: false } : b);
+         return { ...prev, balls: newBalls, gamePhase: 'playing' };
+       });
+     }
+   }, [gameState.gamePhase, gameState.currentPlayer]);
 
-    if (phase === 'playing' && !isShotInProgress && currentPlayer === 2 && !isAIThinking && !aiShot) {
-      setIsAIThinking(true);
-      
-      // Delay AI shot for realism
-      setTimeout(() => {
-        const shot = AIEngine.calculateShot(gameState);
-        if (shot) {
-          setAiShot(shot);
-        }
-        setIsAIThinking(false);
-      }, 1000);
-    }
-  }, [isShotInProgress, gameState, isAIThinking, aiShot]);
+   // AI Shot Triggering (when AI player needs to take a shot)
+   useEffect(() => {
+     if (
+       gameState.gamePhase === 'playing' &&
+       gameState.currentPlayer === 2 &&
+       !isShotInProgress &&
+       !isAIThinking &&
+       !aiShot
+     ) {
+       setIsAIThinking(true);
+       console.log('AI thinking, will calculate shot in 1s');
+       
+       // Delay AI shot for realism
+       const timeoutId = setTimeout(() => {
+         console.log('Calculating AI shot');
+         const shot = AIEngine.calculateShot(gameState);
+         if (shot) {
+           console.log('AI shot calculated:', shot);
+           setAiShot(shot);
+         }
+         setIsAIThinking(false);
+       }, 1000);
+       
+       return () => clearTimeout(timeoutId);
+     }
+   }, [gameState.gamePhase, gameState.currentPlayer, isShotInProgress, isAIThinking, aiShot]);
 
   const handleShoot = useCallback((power: number, angle: number) => {
     if (isShotInProgress || (gameState.gamePhase !== 'playing')) return;
@@ -188,26 +210,28 @@ export const Game: React.FC = () => {
         }
       });
 
-      let nextState = { ...prev, balls: newBalls };
+       let nextState = { ...prev, balls: newBalls };
 
-      if (pocketedBalls.length > 0 || cueBallPocketed) {
-        pocketedBalls.forEach(ball => {
-          nextState = ScoreSystem.handleBallPotted(nextState, ball);
-        });
-        nextState = RulesEngine.processShotResult(nextState, pocketedBalls, cueBallPocketed);
-      }
+       // Handle pocketed balls during the shot
+       if (pocketedBalls.length > 0 || cueBallPocketed) {
+         pocketedBalls.forEach(ball => {
+           nextState = ScoreSystem.handleBallPotted(nextState, ball);
+         });
+         nextState = RulesEngine.processShotResult(nextState, pocketedBalls, cueBallPocketed);
+       }
 
-      // Stop animation when all balls have stopped
-      if (!anyBallsMoving) {
-        setIsShotInProgress(false);
+       // Stop animation when all balls have stopped
+       if (!anyBallsMoving) {
+         // If no balls were potted and no foul, switch turns
+         if (pocketedBalls.length === 0 && !cueBallPocketed && !nextState.foulCommitted) {
+           nextState = RulesEngine.processShotResult(nextState, [], false);
+         }
 
-        // If no balls were potted and no foul, switch turns
-        if (pocketedBalls.length === 0 && !cueBallPocketed && !nextState.foulCommitted) {
-          nextState = RulesEngine.processShotResult(nextState, [], false);
-        }
-      }
+         // Mark that we should end the shot on the next frame
+         setShotJustEnded(true);
+       }
 
-      return nextState;
+       return nextState;
     });
 
     if (isShotInProgress) {
@@ -229,21 +253,31 @@ export const Game: React.FC = () => {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isShotInProgress, updatePhysics]);
+   }, [isShotInProgress, updatePhysics]);
 
-  // Handle AI turn completion and turn switching
-  useEffect(() => {
-    if (!isShotInProgress && gameState.currentPlayer === 2 && gameState.gamePhase === 'playing' && !aiShot) {
-      // AI shot has completed and physics simulation is done
-      // Switch turn back to player 1
-      setGameState(prev => ({
-        ...prev,
-        currentPlayer: 1,
-        gamePhase: 'playing',
-      }));
-      setIsAIThinking(false);
-    }
-  }, [isShotInProgress, gameState.currentPlayer, gameState.gamePhase, aiShot]);
+   // Handle shot ending and state finalization
+   useEffect(() => {
+     if (shotJustEnded) {
+       console.log('Physics complete, ending shot. Current player:', gameState.currentPlayer);
+       setIsShotInProgress(false);
+       setShotJustEnded(false);
+     }
+   }, [shotJustEnded, gameState.currentPlayer]);
+
+    // Handle AI turn completion and switch back to player
+    useEffect(() => {
+     // Only trigger this when shot has completed (isShotInProgress becomes false) and it was an AI turn
+     if (!isShotInProgress && gameState.currentPlayer === 2 && gameState.gamePhase === 'playing' && !aiShot && !isAIThinking) {
+       // AI shot has completed and physics simulation is done
+       // Switch turn back to player 1
+       console.log('Switching turn from AI (player 2) back to Player 1');
+       setGameState(prev => ({
+         ...prev,
+         currentPlayer: 1,
+         gamePhase: 'playing',
+       }));
+     }
+   }, [isShotInProgress, gameState.currentPlayer, gameState.gamePhase, aiShot, isAIThinking]);
 
   const handleStartGame = () => {
     setGameState(prev => ({ ...prev, gamePhase: 'positioning' }));
