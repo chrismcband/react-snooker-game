@@ -26,6 +26,7 @@ declare module 'react-konva' {
     strokeWidth?: number;
     draggable?: boolean;
     visible?: boolean;
+    onDragMove?: (e: any) => void;
     onDragEnd?: (e: any) => void;
     opacity?: number;
     onMouseDown?: (e: any) => void;

@@ -11,7 +11,7 @@ export interface GameState {
   balls: Ball[];
   currentBreak: number;
   foulCommitted: boolean;
-  gamePhase: 'waiting' | 'playing' | 'ended';
+  gamePhase: 'waiting' | 'positioning' | 'playing' | 'ended';
   lastPottedBall: Ball | null;
   redsRemaining: number;
   colorsOnTable: Ball[];

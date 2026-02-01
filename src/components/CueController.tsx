@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Line, Circle, Group, Rect } from 'react-konva';
 import { BALL_PROPERTIES, TABLE_DIMENSIONS } from '../utils/constants';
 
@@ -7,6 +7,8 @@ interface CueControllerProps {
   cueBallY: number;
   onShoot: (power: number, angle: number) => void;
   disabled?: boolean;
+  isAiTurn?: boolean;
+  aiShot?: { angle: number; power: number } | null;
 }
 
 export const CueController: React.FC<CueControllerProps> = ({
@@ -14,21 +16,25 @@ export const CueController: React.FC<CueControllerProps> = ({
   cueBallY,
   onShoot,
   disabled = false,
+  isAiTurn = false,
+  aiShot = null,
 }) => {
   const [isCharging, setIsCharging] = useState(false);
   const [power, setPower] = useState(0);
   const [angle, setAngle] = useState(0);
+  
+  // Animation state for AI
+  const [aiAnimPhase, setAiAnimPhase] = useState<'idle' | 'aiming' | 'charging' | 'releasing'>('idle');
 
   const handleMouseDown = (e: any) => {
-    if (disabled) return;
+    if (disabled || isAiTurn) return;
     setIsCharging(true);
   };
 
   const handleMouseMove = (e: any) => {
-    if (disabled) return;
+    if (disabled || isAiTurn) return;
     
     const pos = e.target.getStage().getPointerPosition();
-    // Offset for the layer transformation in Game.tsx
     const stageX = pos.x - TABLE_DIMENSIONS.frameWidth;
     const stageY = pos.y - TABLE_DIMENSIONS.frameWidth;
     
@@ -36,41 +42,22 @@ export const CueController: React.FC<CueControllerProps> = ({
     const dy = stageY - cueBallY;
     
     if (!isCharging) {
-      // Rotate cue around ball
       const newAngle = Math.atan2(dy, dx);
       setAngle(newAngle);
     } else {
-      // Charge power based on distance
-      // We want to measure distance along the line of aim
-      // or just pure distance from ball to mouse.
       const maxPower = 30;
-      
-      // Calculate dot product to see if we are pulling away from or pushing towards the aim
-      // Vector ball-to-mouse: (dx, dy)
-      // Vector ball-to-aim: (cos(angle), sin(angle))
-      // But actually, pulling AWAY from aim should increase power.
-      // So if mouse is at angle + PI, power should be positive.
-      
       const aimX = Math.cos(angle);
       const aimY = Math.sin(angle);
-      const pullDist = -(dx * aimX + dy * aimY); // Negative dot product means pulling away
-      
+      const pullDist = -(dx * aimX + dy * aimY); 
       const calculatedPower = Math.min(Math.max(pullDist / 10, 0), maxPower);
       setPower(calculatedPower);
     }
   };
 
   const handleMouseUp = () => {
-    if (disabled || !isCharging) return;
+    if (disabled || !isCharging || isAiTurn) return;
     
     if (power > 0.5) {
-      // Shot direction is opposite to where we pull (like a real cue)
-      // Actually, standard pool games: you pull back, cue ball goes forward
-      // The angle currently points FROM ball TO mouse.
-      // So the shot angle should be angle + PI if we pull back.
-      // BUT if we just use the current angle as "aim", then we shoot in that direction.
-      // Let's assume the user aims by pointing the mouse where they want to hit,
-      // then clicks and pulls back.
       onShoot(power, angle);
     }
     
@@ -78,13 +65,41 @@ export const CueController: React.FC<CueControllerProps> = ({
     setPower(0);
   };
 
-  // Calculate cue stick position
+  // AI Animation Logic
+  useEffect(() => {
+    if (isAiTurn && aiShot && aiAnimPhase === 'idle') {
+      setAiAnimPhase('aiming');
+      // Set angle instantly or could animate it
+      setAngle(aiShot.angle);
+      
+      // Charging
+      setTimeout(() => {
+        setAiAnimPhase('charging');
+        let currentPower = 0;
+        const targetPower = aiShot.power;
+        const interval = setInterval(() => {
+          currentPower += 0.5;
+          setPower(currentPower);
+          if (currentPower >= targetPower) {
+            clearInterval(interval);
+            // Release
+            setTimeout(() => {
+              setAiAnimPhase('releasing');
+              onShoot(targetPower, aiShot.angle);
+              setAiAnimPhase('idle');
+              setPower(0);
+            }, 500);
+          }
+        }, 20);
+      }, 1000);
+    }
+  }, [isAiTurn, aiShot, aiAnimPhase, onShoot]);
+
   const getCueStickPosition = () => {
     const stickLength = 300;
-    // When charging, the cue stick pulls back
-    const stickOffset = BALL_PROPERTIES.radius + 5 + (isCharging ? power * 2 : 0);
+    const isActuallyCharging = isCharging || aiAnimPhase === 'charging' || aiAnimPhase === 'releasing';
+    const stickOffset = BALL_PROPERTIES.radius + 5 + (isActuallyCharging ? power * 3 : 0);
     
-    // The cue stick should be on the OPPOSITE side of the aim angle
     const endX = cueBallX - Math.cos(angle) * stickOffset;
     const endY = cueBallY - Math.sin(angle) * stickOffset;
     const startX = endX - Math.cos(angle) * stickLength;
@@ -97,7 +112,6 @@ export const CueController: React.FC<CueControllerProps> = ({
 
   return (
     <Group>
-      {/* Invisible hit area covering the whole table area */}
       <Rect
         x={-TABLE_DIMENSIONS.frameWidth}
         y={-TABLE_DIMENSIONS.frameWidth}
@@ -110,7 +124,6 @@ export const CueController: React.FC<CueControllerProps> = ({
         onMouseLeave={handleMouseUp}
       />
 
-      {/* Aiming line */}
       {!disabled && (
         <Line
           points={[cueBallX, cueBallY, cueBallX + Math.cos(angle) * 1000, cueBallY + Math.sin(angle) * 1000]}
@@ -121,7 +134,6 @@ export const CueController: React.FC<CueControllerProps> = ({
         />
       )}
       
-      {/* Cue stick */}
       {!disabled && (
         <Group>
           <Line
@@ -136,7 +148,6 @@ export const CueController: React.FC<CueControllerProps> = ({
             strokeWidth={5}
             lineCap="round"
           />
-          {/* Cue tip */}
           <Line
             points={[
               cueEndX - Math.cos(angle) * 5,
@@ -150,8 +161,7 @@ export const CueController: React.FC<CueControllerProps> = ({
         </Group>
       )}
 
-      {/* Power indicator near cue ball */}
-      {isCharging && (
+      {(isCharging || aiAnimPhase === 'charging') && (
         <Circle
           x={cueBallX}
           y={cueBallY}

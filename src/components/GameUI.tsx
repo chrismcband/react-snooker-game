@@ -1,20 +1,19 @@
 import React from 'react';
-import { GameStateManager } from '../game/GameState';
+import { GameState } from '../game/ScoreSystem';
+import { RulesEngine } from '../game/RulesEngine';
 
 interface GameUIProps {
-  gameState: GameStateManager;
+  gameState: GameState;
   onStartGame: () => void;
   onResetGame: () => void;
 }
 
 export const GameUI: React.FC<GameUIProps> = ({ gameState, onStartGame, onResetGame }) => {
-  const state = gameState.getState();
-  const scores = gameState.getScores();
-  const currentPlayer = gameState.getCurrentPlayer();
-  const currentBreak = gameState.getCurrentBreak();
-  const isGameActive = gameState.isGameActive();
-  const isGameEnded = gameState.isGameEnded();
-  const winner = gameState.getWinner();
+  const scores = gameState.scores;
+  const currentPlayer = gameState.currentPlayer;
+  const currentBreak = gameState.currentBreak;
+  const isGameEnded = gameState.gamePhase === 'ended';
+  const isOnReds = RulesEngine.isOnReds(gameState);
 
   return (
     <div style={{
@@ -50,17 +49,17 @@ export const GameUI: React.FC<GameUIProps> = ({ gameState, onStartGame, onResetG
         </div>
 
         <div style={{ marginBottom: '10px' }}>
-          <strong>Reds Remaining:</strong> {state.redsRemaining}
+          <strong>Reds Remaining:</strong> {gameState.redsRemaining}
         </div>
 
         <div>
-          <strong>Phase:</strong> {gameState.isOnReds() ? 'On Reds' : 'On Colors'}
+          <strong>Phase:</strong> {gameState.gamePhase === 'positioning' ? 'Positioning Cue Ball' : (isOnReds ? 'On Reds' : 'On Colors')}
         </div>
       </div>
 
       {/* Game Controls */}
-      <div>
-        {!isGameActive && !isGameEnded && (
+      <div style={{ marginTop: '10px' }}>
+        {gameState.gamePhase === 'waiting' && (
           <button
             onClick={onStartGame}
             style={{
@@ -71,9 +70,10 @@ export const GameUI: React.FC<GameUIProps> = ({ gameState, onStartGame, onResetG
               borderRadius: '5px',
               cursor: 'pointer',
               marginRight: '10px',
+              fontWeight: 'bold',
             }}
           >
-            Start Game
+            START GAME
           </button>
         )}
 
@@ -86,14 +86,15 @@ export const GameUI: React.FC<GameUIProps> = ({ gameState, onStartGame, onResetG
             border: 'none',
             borderRadius: '5px',
             cursor: 'pointer',
+            fontWeight: 'bold',
           }}
         >
-          Reset Game
+          RESET GAME
         </button>
       </div>
 
       {/* Game End Message */}
-      {isGameEnded && winner && (
+      {isGameEnded && (
         <div style={{
           marginTop: '20px',
           padding: '10px',
@@ -102,7 +103,7 @@ export const GameUI: React.FC<GameUIProps> = ({ gameState, onStartGame, onResetG
           textAlign: 'center',
         }}>
           <strong>Game Over!</strong><br />
-          Player {winner} wins!
+          {scores.player1 > scores.player2 ? 'Player 1 wins!' : scores.player2 > scores.player1 ? 'Player 2 wins!' : 'Draw!'}
         </div>
       )}
 

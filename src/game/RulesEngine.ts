@@ -110,10 +110,14 @@ export class RulesEngine {
         newState.balls = newState.balls.map(b =>
           b.id === 'cue' ? { ...b, isPocketed: false, x: 200, y: 200, vx: 0, vy: 0 } : b
         );
+        newState.gamePhase = 'positioning';
+      } else {
+        newState.gamePhase = 'playing';
       }
     } else {
       if (pottedBalls.length > 0) {
         newState.foulCommitted = false;
+        newState.gamePhase = 'playing';
         
         // Update next required type
         if (pottedBalls.some(b => b.type === 'red')) {
@@ -137,6 +141,7 @@ export class RulesEngine {
         newState.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
         newState.currentBreak = 0;
         newState.nextRequiredType = state.redsRemaining > 0 ? 'red' : this.getCurrentColorInSequence(newState);
+        newState.gamePhase = 'playing';
       }
     }
 

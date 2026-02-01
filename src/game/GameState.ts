@@ -33,7 +33,19 @@ export class GameStateManager {
   }
 
   public startGame(): void {
+    this.state.gamePhase = 'positioning';
+  }
+
+  public setPlaying(): void {
     this.state.gamePhase = 'playing';
+  }
+
+  public setPhase(phase: 'waiting' | 'positioning' | 'playing' | 'ended'): void {
+    this.state.gamePhase = phase;
+  }
+
+  public getPhase(): string {
+    return this.state.gamePhase;
   }
 
   public updateBallPosition(ballId: string, x: number, y: number): void {
@@ -71,7 +83,7 @@ export class GameStateManager {
   }
 
   public isGameActive(): boolean {
-    return this.state.gamePhase === 'playing';
+    return this.state.gamePhase === 'playing' || this.state.gamePhase === 'positioning';
   }
 
   public isGameEnded(): boolean {
