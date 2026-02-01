@@ -411,14 +411,14 @@ export const Game: React.FC = () => {
        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
          <Stage
            ref={stageRef}
-           width={TABLE_DIMENSIONS.width + TABLE_DIMENSIONS.frameWidth * 2}
-           height={TABLE_DIMENSIONS.height + TABLE_DIMENSIONS.frameWidth * 2}
+           width={TABLE_DIMENSIONS.width + TABLE_DIMENSIONS.frameWidth * 4}
+           height={TABLE_DIMENSIONS.height + TABLE_DIMENSIONS.frameWidth * 4}
          >
-           <Layer>
+           <Layer x={TABLE_DIMENSIONS.frameWidth * 2} y={TABLE_DIMENSIONS.frameWidth * 2}>
              {cueBall && !cueBall.isPocketed && gameState.gamePhase === 'playing' && (
                <CueController
-                 cueBallX={cueBall.x + TABLE_DIMENSIONS.frameWidth}
-                 cueBallY={cueBall.y + TABLE_DIMENSIONS.frameWidth}
+                 cueBallX={cueBall.x}
+                 cueBallY={cueBall.y}
                  onShoot={handleShoot}
                  disabled={isShotInProgress}
                  isAiTurn={isAiTurn}
@@ -427,7 +427,7 @@ export const Game: React.FC = () => {
                />
              )}
            </Layer>
-           <Layer x={TABLE_DIMENSIONS.frameWidth} y={TABLE_DIMENSIONS.frameWidth}>
+           <Layer x={TABLE_DIMENSIONS.frameWidth * 3} y={TABLE_DIMENSIONS.frameWidth * 3}>
              <Table>
                {balls.map(ball => (
                  <Ball
