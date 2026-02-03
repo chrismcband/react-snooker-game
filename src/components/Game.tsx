@@ -258,26 +258,10 @@ export const Game: React.FC = () => {
     const updatePhysics = useCallback(() => {
       // Use ref to avoid stale closure issues
       if (!isShotInProgressRef.current) {
-        console.log('[Physics] Shot no longer in progress, stopping physics loop');
         return;
       }
-      
-      console.log('[Physics] updatePhysics frame running');
 
       setGameState(prev => {
-        // Calculate delta time for frame-rate independent physics
-        const currentTime = performance.now();
-        let deltaTime = 0.016; // Default to ~60fps (16ms)
-        
-        // Debug: Log first frame of physics
-        if (lastFrameTimeRef.current === 0) {
-          console.log('[Physics] Starting physics loop, cue ball vx:', prev.balls.find(b => b.id === 'cue')?.vx);
-        }
-        
-        if (lastFrameTimeRef.current > 0) {
-          deltaTime = Math.min((currentTime - lastFrameTimeRef.current) / 1000, 0.05); // Cap at 50ms to prevent huge jumps
-        }
-        lastFrameTimeRef.current = currentTime;
 
         const newBalls = prev.balls.map(b => ({ ...b }));
         let anyBallsMoving = false;
@@ -287,22 +271,9 @@ export const Game: React.FC = () => {
           const ball = newBalls[i];
           if (ball.isPocketed) continue;
 
-          const velBefore = { vx: ball.vx, vy: ball.vy };
-          const posBefore = { x: ball.x, y: ball.y };
-          
-          CollisionSystem.applyFriction(ball, PHYSICS_CONSTANTS.friction, deltaTime);
-          CollisionSystem.updateBallPosition(ball, deltaTime);
+          CollisionSystem.applyFriction(ball, PHYSICS_CONSTANTS.friction);
+          CollisionSystem.updateBallPosition(ball);
           CollisionSystem.resolveCushionCollision(ball, PHYSICS_CONSTANTS.restitution);
-
-          if (ball.id === 'cue' && (velBefore.vx !== 0 || velBefore.vy !== 0)) {
-            console.log('[Physics] Cue ball update:', {
-              deltaTime,
-              velBefore,
-              velAfter: { vx: ball.vx, vy: ball.vy },
-              posBefore,
-              posAfter: { x: ball.x, y: ball.y },
-            });
-          }
 
          if (CollisionSystem.isBallMoving(ball)) {
            anyBallsMoving = true;
