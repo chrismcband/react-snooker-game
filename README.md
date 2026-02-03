@@ -1,6 +1,14 @@
-# Getting Started with Create React App
+# React Snooker Game
 
+This is a react snooker game, primarily built using opencode with Claude Haiku 4.5 model. It was mostly prompted over around 2 days.
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+
+## Running the game
+When the game starts you'll see the table render. Press Start to begin.
+You will play first, drag the cue ball to move it within the D, you only get one drag attempt, so make it count.
+After releasing the position of the ball, you are in shot mode. Rotate the cue, when ready with aim. Press down the mouse button and drag back for power, release to take the shot.
+AI will take the next turn, you go after... etc.
+Have fun!
 
 ## Available Scripts
 
