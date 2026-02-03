@@ -16,11 +16,15 @@ export class RulesEngine {
   };
 
   // Get foul points for a specific ball
+  // Minimum foul points is 4, unless a high-value ball (blue=5, pink=6, black=7) is involved
   private static getFoulPointsForBall(ballId: string): number {
-    if (ballId === 'cue') return 4;
-    
     const colorPoints = this.colorPointValues[ballId];
-    return colorPoints || 4; // Default to 4 if ball not found
+    if (colorPoints !== undefined) {
+      // For color balls, return their point value only if it's higher than 4
+      return Math.max(4, colorPoints);
+    }
+    // Default to 4 for any other ball (including cue ball)
+    return 4;
   }
 
   // Check if a shot is valid according to snooker rules
@@ -58,10 +62,11 @@ export class RulesEngine {
             const ballPoints = this.getFoulPointsForBall(firstBallHit.id);
             return { valid: false, reason: `Hit wrong ball (${firstBallHit.id})`, foulPoints: ballPoints };
           }
-        } else if (state.nextRequiredType === 'any-color') {
-          if (firstBallHit.type !== 'color') {
-            return { valid: false, reason: 'Must hit a color', foulPoints: 4 };
-          }
+         } else if (state.nextRequiredType === 'any-color') {
+           if (firstBallHit.type !== 'color') {
+             const ballPoints = this.getFoulPointsForBall(firstBallHit.id);
+             return { valid: false, reason: 'Must hit a color', foulPoints: ballPoints };
+           }
         } else {
           if (firstBallHit.id !== state.nextRequiredType) {
             const ballPoints = this.getFoulPointsForBall(firstBallHit.id);
@@ -81,26 +86,34 @@ export class RulesEngine {
         const ballPoints = this.getFoulPointsForBall(firstPotted.id);
         return { valid: false, reason: 'Must pot a red', foulPoints: ballPoints };
       }
-      // If multiple balls potted, they must all be reds
-      if (pottedBalls.some(b => b.type !== 'red')) {
-        return { valid: false, reason: 'Cannot pot colors with reds', foulPoints: 7 };
-      }
-    } else if (state.nextRequiredType === 'any-color') {
-      if (firstPotted.type !== 'color') {
-        return { valid: false, reason: 'Must pot a color', foulPoints: 4 };
-      }
-      if (pottedBalls.length > 1) {
-        return { valid: false, reason: 'Cannot pot multiple colors', foulPoints: 7 };
-      }
+       // If multiple balls potted, they must all be reds
+       if (pottedBalls.some(b => b.type !== 'red')) {
+         // Non-red ball was potted with reds - get highest foul points
+         const foulPoints = Math.max(...pottedBalls.map(b => this.getFoulPointsForBall(b.id)));
+         return { valid: false, reason: 'Cannot pot colors with reds', foulPoints };
+       }
+     } else if (state.nextRequiredType === 'any-color') {
+       if (firstPotted.type !== 'color') {
+         // Potted a red when should pot a color
+         const ballPoints = this.getFoulPointsForBall(firstPotted.id);
+         return { valid: false, reason: 'Must pot a color', foulPoints: ballPoints };
+       }
+       if (pottedBalls.length > 1) {
+         // Multiple balls potted - get highest foul points
+         const foulPoints = Math.max(...pottedBalls.map(b => this.getFoulPointsForBall(b.id)));
+         return { valid: false, reason: 'Cannot pot multiple colors', foulPoints };
+       }
     } else {
       // Must pot the specific color in sequence
       if (firstPotted.id !== state.nextRequiredType) {
         const ballPoints = this.getFoulPointsForBall(firstPotted.id);
         return { valid: false, reason: `Must pot ${state.nextRequiredType}`, foulPoints: ballPoints };
       }
-      if (pottedBalls.length > 1) {
-        return { valid: false, reason: 'Cannot pot multiple balls', foulPoints: 7 };
-      }
+       if (pottedBalls.length > 1) {
+         // Multiple balls potted - get highest foul points
+         const foulPoints = Math.max(...pottedBalls.map(b => this.getFoulPointsForBall(b.id)));
+         return { valid: false, reason: 'Cannot pot multiple balls', foulPoints };
+       }
     }
 
     return { valid: true };
