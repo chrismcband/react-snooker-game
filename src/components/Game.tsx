@@ -505,9 +505,9 @@ export const Game: React.FC = () => {
 
    const isAiTurn = gameState.currentPlayer === 2 && gameState.gamePhase === 'playing';
 
-     return (
-      <>
-        <div style={{ position: 'relative', width: '100vw', height: '100vh', backgroundColor: '#1a1a1a', display: 'flex', flexDirection: 'column' }}>
+      return (
+       <>
+         <div style={{ position: 'relative', width: '100vw', height: '100vh', backgroundColor: '#1a1a1a', display: 'flex', flexDirection: 'column', userSelect: 'none' }}>
           <GameUI
             gameState={gameState}
             onStartGame={handleStartGame}
