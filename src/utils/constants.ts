@@ -100,7 +100,7 @@ export const POCKET_POSITIONS = [
 // Physics constants
 export const PHYSICS_CONSTANTS = {
   gravity: 0,
-  friction: 0.99, // Rolling friction
+  friction: 0.9875, // Rolling friction
   restitution: 0.95, // Bounciness
   maxVelocity: 20,
   minVelocity: 0.01,
