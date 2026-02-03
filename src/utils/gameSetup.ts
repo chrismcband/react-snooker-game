@@ -34,18 +34,19 @@ export function createInitialBalls(): Ball[] {
     spinZ: 0,
   });
 
-   // Create red balls (triangle formation)
-   // The triangle apex should be at the pink spot
-   const apexX = TABLE_MARKINGS.pinkSpotX;
-   const apexY = TABLE_MARKINGS.pinkSpotY;
+    // Create red balls (triangle formation)
+    // The triangle apex should be BEHIND the pink spot (higher X value, further from the baulk)
+    // Pink is at 75% of table width. Red triangle should be further back (toward top cushion)
+    const apexX = TABLE_MARKINGS.pinkSpotX + BALL_PROPERTIES.radius * 2 * 2; // Position apex 2 ball diameters behind pink
+    const apexY = TABLE_MARKINGS.pinkSpotY;
 
-   let ballIndex = 0;
-   for (let row = 0; row < 5; row++) {
-     for (let col = 0; col <= row; col++) {
-       // Calculate position in triangle
-       // apex is on the left (at pink spot), base is on the right
-       const x = apexX + row * BALL_PROPERTIES.radius * 2 + 2; // +2 for a small gap from pink
-       const y = apexY + (col - row / 2) * BALL_PROPERTIES.radius * 2.05;
+    let ballIndex = 0;
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col <= row; col++) {
+        // Calculate position in triangle
+        // apex is on the left (behind pink spot), base extends further right
+        const x = apexX + row * BALL_PROPERTIES.radius * 2;
+        const y = apexY + (col - row / 2) * BALL_PROPERTIES.radius * 2.05;
 
        balls.push({
          id: `red-${ballIndex}`,
