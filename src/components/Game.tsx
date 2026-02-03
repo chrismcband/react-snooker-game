@@ -8,7 +8,7 @@ import { FoulNotification } from './FoulNotification';
 import { createInitialBalls } from '../utils/gameSetup';
 import { CollisionSystem } from '../physics/CollisionSystem';
 import { PocketSystem } from '../game/PocketSystem';
-import { GameState as GameStateType, ScoreSystem } from '../game/ScoreSystem';
+import { GameState as GameStateType } from '../game/ScoreSystem';
 import { RulesEngine } from '../game/RulesEngine';
 import { Ball as BallType } from '../types/Ball';
 import { TABLE_DIMENSIONS, PHYSICS_CONSTANTS, TABLE_MARKINGS } from '../utils/constants';
