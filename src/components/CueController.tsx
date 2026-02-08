@@ -38,14 +38,15 @@ export const CueController: React.FC<CueControllerProps> = ({
   // Track which AI shot is currently being executed to prevent double-firing
   const aiShotIdRef = useRef<string | null>(null);
   
-  // Track initial mouse position when user starts charging
-  const initialMousePosRef = useRef<{ x: number; y: number } | null>(null);
+   // Track initial mouse/touch position when user starts charging
+   const initialMousePosRef = useRef<{ x: number; y: number } | null>(null);
+   const isTouchRef = useRef<boolean>(false);
 
-   // Use refs to track latest values for the window event listeners to avoid closure issues
-   const stateRef = useRef({ isCharging, power, angle, disabled, isAiTurn });
-   useEffect(() => {
-     stateRef.current = { isCharging, power, angle, disabled, isAiTurn };
-   }, [isCharging, power, angle, disabled, isAiTurn]);
+    // Use refs to track latest values for the window event listeners to avoid closure issues
+    const stateRef = useRef({ isCharging, power, angle, disabled, isAiTurn });
+    useEffect(() => {
+      stateRef.current = { isCharging, power, angle, disabled, isAiTurn };
+    }, [isCharging, power, angle, disabled, isAiTurn]);
 
   // Reset controller state when it's no longer AI turn (turn switched to player)
   useEffect(() => {
@@ -161,22 +162,123 @@ export const CueController: React.FC<CueControllerProps> = ({
       setPower(0); // Start with 0 power
     };
 
-    const handleWindowMouseUp = () => {
-      if (stateRef.current.isCharging && !stateRef.current.disabled && !stateRef.current.isAiTurn) {
-        handleMouseUpLocal();
-      }
-    };
+     const handleWindowMouseUp = () => {
+       if (stateRef.current.isCharging && !stateRef.current.disabled && !stateRef.current.isAiTurn) {
+         handleMouseUpLocal();
+       }
+     };
 
-    window.addEventListener('mousedown', handleWindowMouseDown);
-    window.addEventListener('mousemove', handleWindowMouseMove);
-    window.addEventListener('mouseup', handleWindowMouseUp);
+     const handleWindowTouchStart = (e: TouchEvent) => {
+       if (stateRef.current.disabled || stateRef.current.isAiTurn || !stageRef.current) return;
+       
+       const touch = e.touches[0];
+       if (!touch) return;
+       
+       const container = stageRef.current.container();
+       if (!container) return;
+       
+       const rect = container.getBoundingClientRect();
+       const screenX = touch.clientX - rect.left;
+       const screenY = touch.clientY - rect.top;
+       
+       // Account for CSS scale and convert to Stage coordinates
+       initialMousePosRef.current = {
+         x: screenX / scale,
+         y: screenY / scale
+       };
+       
+       isTouchRef.current = true;
+       setIsCharging(true);
+       setPower(0); // Start with 0 power
+       e.preventDefault();
+     };
 
-    return () => {
-      window.removeEventListener('mousedown', handleWindowMouseDown);
-      window.removeEventListener('mousemove', handleWindowMouseMove);
-      window.removeEventListener('mouseup', handleWindowMouseUp);
-    };
-  }, [cueBallX, cueBallY, onShoot, stageRef, handleMouseUpLocal, scale, cueRenderingSpace]);
+     const handleWindowTouchMove = (e: TouchEvent) => {
+       const { disabled, isAiTurn, isCharging, angle: currentAngle } = stateRef.current;
+       if (disabled || isAiTurn || !stageRef.current || !isTouchRef.current) return;
+       
+       const touch = e.touches[0];
+       if (!touch) return;
+       
+       const container = stageRef.current.container();
+       if (!container) return;
+       const rect = container.getBoundingClientRect();
+       
+       // Get touch position relative to container
+       const screenX = touch.clientX - rect.left;
+       const screenY = touch.clientY - rect.top;
+       
+       // The parent div has a CSS scale transform, so we need to account for that
+       // Unscale the coordinates to get Stage coordinates
+       const pos = {
+         x: screenX / scale,
+         y: screenY / scale
+       };
+       
+       // Convert from Stage coordinates to Layer coordinates
+       // The layer is positioned at (cueRenderingSpace + frameWidth) in Stage coords
+       const layerX = cueRenderingSpace + TABLE_DIMENSIONS.frameWidth;
+       const layerY = cueRenderingSpace + TABLE_DIMENSIONS.frameWidth;
+       const stageX = pos.x - layerX;
+       const stageY = pos.y - layerY;
+     
+       const dx = stageX - cueBallX;
+       const dy = stageY - cueBallY;
+       
+        if (!isCharging) {
+          // Angle points from cursor TO ball
+          const newAngle = Math.atan2(-dy, -dx);
+          setAngle(newAngle);
+        } else if (initialMousePosRef.current) {
+          // Calculate power based on distance from initial touch position
+          const maxPower = 30;
+          
+          // Calculate distance from initial touch position to current position
+          const initialX = initialMousePosRef.current.x;
+          const initialY = initialMousePosRef.current.y;
+          
+          const dragDx = pos.x - initialX;
+          const dragDy = pos.y - initialY;
+          
+          // aim vector (the direction the cue is pointing)
+          const aimX = Math.cos(currentAngle);
+          const aimY = Math.sin(currentAngle);
+          
+          // Project the drag vector onto the aim direction (opposite direction)
+          // Positive pullDist = dragging away from ball (increasing power)
+          const pullDist = (dragDx * -aimX + dragDy * -aimY);
+          
+          // Convert drag distance to power (10 pixels = 1 power unit)
+          const calculatedPower = Math.min(Math.max(pullDist / 10, 0), maxPower);
+          setPower(calculatedPower);
+        }
+        e.preventDefault();
+     };
+
+     const handleWindowTouchEnd = (e: TouchEvent) => {
+       if (stateRef.current.isCharging && !stateRef.current.disabled && !stateRef.current.isAiTurn) {
+         handleMouseUpLocal();
+       }
+       isTouchRef.current = false;
+       e.preventDefault();
+     };
+
+     window.addEventListener('mousedown', handleWindowMouseDown);
+     window.addEventListener('mousemove', handleWindowMouseMove);
+     window.addEventListener('mouseup', handleWindowMouseUp);
+     window.addEventListener('touchstart', handleWindowTouchStart);
+     window.addEventListener('touchmove', handleWindowTouchMove, { passive: false });
+     window.addEventListener('touchend', handleWindowTouchEnd);
+
+     return () => {
+       window.removeEventListener('mousedown', handleWindowMouseDown);
+       window.removeEventListener('mousemove', handleWindowMouseMove);
+       window.removeEventListener('mouseup', handleWindowMouseUp);
+       window.removeEventListener('touchstart', handleWindowTouchStart);
+       window.removeEventListener('touchmove', handleWindowTouchMove);
+       window.removeEventListener('touchend', handleWindowTouchEnd);
+     };
+   }, [cueBallX, cueBallY, onShoot, stageRef, handleMouseUpLocal, scale, cueRenderingSpace]);
 
    // AI Animation Logic
    useEffect(() => {
