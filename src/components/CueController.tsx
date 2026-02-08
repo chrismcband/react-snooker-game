@@ -41,6 +41,7 @@ export const CueController: React.FC<CueControllerProps> = ({
    // Track initial mouse/touch position when user starts charging
    const initialMousePosRef = useRef<{ x: number; y: number } | null>(null);
    const isTouchRef = useRef<boolean>(false);
+   const touchOnCueRef = useRef<boolean>(false); // Track if touch started on the cue
 
     // Use refs to track latest values for the window event listeners to avoid closure issues
     const stateRef = useRef({ isCharging, power, angle, disabled, isAiTurn });
@@ -81,8 +82,30 @@ export const CueController: React.FC<CueControllerProps> = ({
     initialMousePosRef.current = null; // Reset initial position
   }, [disabled, isAiTurn, onShoot]);
 
-    // Use window events to capture mouse movement even outside the canvas
-    useEffect(() => {
+   const getCueStickPosition = useCallback(() => {
+     const stickLength = 300;
+     const isActuallyCharging = isCharging || aiAnimPhase === 'charging' || aiAnimPhase === 'releasing';
+     const stickOffset = BALL_PROPERTIES.radius + 5 + (isActuallyCharging ? power * 3 : 0);
+     
+     const endX = cueBallX - Math.cos(angle) * stickOffset;
+     const endY = cueBallY - Math.sin(angle) * stickOffset;
+     const startX = endX - Math.cos(angle) * stickLength;
+     const startY = endY - Math.sin(angle) * stickLength;
+     
+     return { startX, startY, endX, endY };
+   }, [angle, isCharging, power, cueBallX, cueBallY, aiAnimPhase]);
+
+   const pointToLineDistance = useCallback((px: number, py: number, x1: number, y1: number, x2: number, y2: number): number => {
+     const dx = x2 - x1;
+     const dy = y2 - y1;
+     const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+     const closestX = x1 + t * dx;
+     const closestY = y1 + t * dy;
+     return Math.sqrt((px - closestX) ** 2 + (py - closestY) ** 2);
+   }, []);
+
+     // Use window events to capture mouse movement even outside the canvas
+     useEffect(() => {
       const handleWindowMouseMove = (e: MouseEvent) => {
         const { disabled, isAiTurn, isCharging, angle: currentAngle } = stateRef.current;
         // Don't process mouse move if disabled or it's AI turn
@@ -182,18 +205,35 @@ export const CueController: React.FC<CueControllerProps> = ({
        const screenY = touch.clientY - rect.top;
        
        // Account for CSS scale and convert to Stage coordinates
-       initialMousePosRef.current = {
+       const stagePos = {
          x: screenX / scale,
          y: screenY / scale
        };
        
+       // Convert to layer coordinates to check if touch is on the cue
+       const layerX = cueRenderingSpace + TABLE_DIMENSIONS.frameWidth;
+       const layerY = cueRenderingSpace + TABLE_DIMENSIONS.frameWidth;
+       const layerPosX = stagePos.x - layerX;
+       const layerPosY = stagePos.y - layerY;
+       
+       // Check if touch is on or near the cue stick (within 20 pixels of the cue line)
+       const { startX: cueStartX, startY: cueStartY, endX: cueEndX, endY: cueEndY } = getCueStickPosition();
+       const distToCue = pointToLineDistance(layerPosX, layerPosY, cueStartX, cueStartY, cueEndX, cueEndY);
+       const touchOnCue = distToCue < 20; // 20 pixel tolerance
+       
+       initialMousePosRef.current = stagePos;
        isTouchRef.current = true;
-       setIsCharging(true);
-       setPower(0); // Start with 0 power
+       touchOnCueRef.current = touchOnCue;
+       
+       if (touchOnCue) {
+         // Starting on cue - begin charging
+         setIsCharging(true);
+         setPower(0);
+       }
        e.preventDefault();
      };
 
-     const handleWindowTouchMove = (e: TouchEvent) => {
+      const handleWindowTouchMove = (e: TouchEvent) => {
        const { disabled, isAiTurn, isCharging, angle: currentAngle } = stateRef.current;
        if (disabled || isAiTurn || !stageRef.current || !isTouchRef.current) return;
        
@@ -225,41 +265,46 @@ export const CueController: React.FC<CueControllerProps> = ({
        const dx = stageX - cueBallX;
        const dy = stageY - cueBallY;
        
-        if (!isCharging) {
+        if (touchOnCueRef.current) {
+          // Touch started on cue - use for charging
+          if (isCharging && initialMousePosRef.current) {
+            // Calculate power based on distance from initial touch position
+            const maxPower = 30;
+            
+            // Calculate distance from initial touch position to current position
+            const initialX = initialMousePosRef.current.x;
+            const initialY = initialMousePosRef.current.y;
+            
+            const dragDx = pos.x - initialX;
+            const dragDy = pos.y - initialY;
+            
+            // aim vector (the direction the cue is pointing)
+            const aimX = Math.cos(currentAngle);
+            const aimY = Math.sin(currentAngle);
+            
+            // Project the drag vector onto the aim direction (opposite direction)
+            // Positive pullDist = dragging away from ball (increasing power)
+            const pullDist = (dragDx * -aimX + dragDy * -aimY);
+            
+            // Convert drag distance to power (10 pixels = 1 power unit)
+            const calculatedPower = Math.min(Math.max(pullDist / 10, 0), maxPower);
+            setPower(calculatedPower);
+          }
+        } else {
+          // Touch started away from cue - use for aiming
           // Angle points from cursor TO ball
           const newAngle = Math.atan2(-dy, -dx);
           setAngle(newAngle);
-        } else if (initialMousePosRef.current) {
-          // Calculate power based on distance from initial touch position
-          const maxPower = 30;
-          
-          // Calculate distance from initial touch position to current position
-          const initialX = initialMousePosRef.current.x;
-          const initialY = initialMousePosRef.current.y;
-          
-          const dragDx = pos.x - initialX;
-          const dragDy = pos.y - initialY;
-          
-          // aim vector (the direction the cue is pointing)
-          const aimX = Math.cos(currentAngle);
-          const aimY = Math.sin(currentAngle);
-          
-          // Project the drag vector onto the aim direction (opposite direction)
-          // Positive pullDist = dragging away from ball (increasing power)
-          const pullDist = (dragDx * -aimX + dragDy * -aimY);
-          
-          // Convert drag distance to power (10 pixels = 1 power unit)
-          const calculatedPower = Math.min(Math.max(pullDist / 10, 0), maxPower);
-          setPower(calculatedPower);
         }
         e.preventDefault();
      };
 
-     const handleWindowTouchEnd = (e: TouchEvent) => {
+      const handleWindowTouchEnd = (e: TouchEvent) => {
        if (stateRef.current.isCharging && !stateRef.current.disabled && !stateRef.current.isAiTurn) {
          handleMouseUpLocal();
        }
        isTouchRef.current = false;
+       touchOnCueRef.current = false;
        e.preventDefault();
      };
 
@@ -278,7 +323,7 @@ export const CueController: React.FC<CueControllerProps> = ({
        window.removeEventListener('touchmove', handleWindowTouchMove);
        window.removeEventListener('touchend', handleWindowTouchEnd);
      };
-   }, [cueBallX, cueBallY, onShoot, stageRef, handleMouseUpLocal, scale, cueRenderingSpace]);
+    }, [cueBallX, cueBallY, onShoot, stageRef, handleMouseUpLocal, scale, cueRenderingSpace, getCueStickPosition, pointToLineDistance]);
 
    // AI Animation Logic
    useEffect(() => {
@@ -327,20 +372,7 @@ export const CueController: React.FC<CueControllerProps> = ({
      }
    }, [isAiTurn, aiShot, aiAnimPhase, onShoot]);
 
-  const getCueStickPosition = () => {
-    const stickLength = 300;
-    const isActuallyCharging = isCharging || aiAnimPhase === 'charging' || aiAnimPhase === 'releasing';
-    const stickOffset = BALL_PROPERTIES.radius + 5 + (isActuallyCharging ? power * 3 : 0);
-    
-    const endX = cueBallX - Math.cos(angle) * stickOffset;
-    const endY = cueBallY - Math.sin(angle) * stickOffset;
-    const startX = endX - Math.cos(angle) * stickLength;
-    const startY = endY - Math.sin(angle) * stickLength;
-    
-    return { startX, startY, endX, endY };
-  };
-
-   const { startX: cueStartX, startY: cueStartY, endX: cueEndX, endY: cueEndY } = getCueStickPosition();
+    const { startX: cueStartX, startY: cueStartY, endX: cueEndX, endY: cueEndY } = getCueStickPosition();
 
      return (
       <Group>
